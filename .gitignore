@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+release/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.nimbus-data/
+agent-tools/
+terminals/
+.pnpm-store/

@@ -1,0 +1,32 @@
+{
+  "name": "@nimbus/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "nimbus-server": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@nimbus/agent-core": "workspace:*",
+    "@nimbus/shared": "workspace:*",
+    "hono": "^4.10.0",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/ws": "^8.18.1",
+    "tsup": "^8.5.1",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  }
+}
