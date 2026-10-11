@@ -33,6 +33,7 @@ export function SignIn() {
   }
 
   const redirectHint = error && /redirect/i.test(error);
+  const onPhone = location.hostname !== "localhost" && location.hostname !== "127.0.0.1";
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-5 py-10 safe-top safe-bottom">
@@ -60,6 +61,12 @@ export function SignIn() {
           {pending ? <Loader2 className="animate-spin" /> : <GoogleMark />}
           {pending ? "Opening Google…" : "Continue with Google"}
         </Button>
+
+        {onPhone && (
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+            Google must return to <span className="font-mono break-all text-foreground">{location.origin}/</span>. If this phone opens localhost:3000, that is Supabase’s default Site URL. In the project’s Authentication → URL configuration, change Site URL to <span className="font-mono">http://127.0.0.1:47830</span> and add <span className="font-mono break-all">{location.origin}/**</span> and <span className="font-mono">http://**:47830/**</span> under Redirect URLs.
+          </p>
+        )}
 
         {error && (
           <p className="mt-4 text-sm leading-relaxed text-destructive">
