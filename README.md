@@ -63,6 +63,7 @@ Open **Settings → Model** and paste a key. It stays in the local SQLite databa
 
 | Provider | Base URL | Notes |
 | --- | --- | --- |
+| DeepSeek | `https://api.deepseek.com` | Default. `deepseek-v4-pro` with thinking mode, or `deepseek-flash` for a faster model. Set `DEEPSEEK_API_KEY` or paste a key in Settings → Model |
 | xAI Grok | `https://api.x.ai/v1` | Responses API, including hosted `web_search`, `x_search`, and `code_execution` when server tools are enabled |
 | OpenAI-compatible | any `/v1` server | OpenAI, OpenRouter, Ollama, LM Studio, … |
 | Offline demo | — | No network |
@@ -90,6 +91,7 @@ Drop `SKILL.md` packages in `<workspace>/.nimbus/skills/<name>/SKILL.md`. Durabl
 | `NIMBUS_DATA_DIR` | `~/.nimbus` | SQLite database, device tokens, memory |
 | `NIMBUS_WORKSPACE` | `<data>/workspace` | Directory the agent reads, edits, and runs commands in |
 | `NIMBUS_WEB_DIST` | unset | Built web client to serve. The desktop shell sets this |
+| `DEEPSEEK_API_KEY` | unset | DeepSeek key. A key saved in Settings → Model replaces this |
 | `BRAVE_API_KEY` | unset | Optional web search provider |
 | `COMPOSIO_API_KEY` | unset | Lets the agent use apps you connect in Settings → Apps |
 

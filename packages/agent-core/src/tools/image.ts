@@ -22,11 +22,14 @@ export const imageGen: ToolDefinition<{ prompt: string; n?: number }> = {
   summarize: (a) => a.prompt,
   async execute(args, ctx) {
     const provider = ctx.session.settings.provider;
+    if (provider.kind === "deepseek") {
+      return { output: "DeepSeek does not generate images. Describe the image in text, or switch the model provider to one with an image API.", isError: true };
+    }
     if (provider.kind === "mock" || !provider.apiKey) {
       const seed = encodeURIComponent(args.prompt.slice(0, 40));
       const url = `https://picsum.photos/seed/${seed}/768/512`;
       return {
-        output: `Generated placeholder image (configure an xAI/OpenAI key for real generations): ${url}`,
+        output: `Generated placeholder image. DeepSeek does not generate images; an xAI or OpenAI key can: ${url}`,
         display: { kind: "image", url, prompt: args.prompt },
         parts: [{ type: "image", url, alt: args.prompt }],
       };

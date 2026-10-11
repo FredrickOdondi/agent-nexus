@@ -8,7 +8,7 @@ export class ChatCompletionsProvider implements LLMProvider {
   kind = "openai_compatible";
   hostedTools: string[] = [];
 
-  constructor(private opts: { baseUrl: string; apiKey?: string }) {}
+  constructor(private opts: { baseUrl: string; apiKey?: string; thinking?: boolean }) {}
 
   private toMessages(system: string, messages: ProviderMessage[]) {
     const out: unknown[] = [{ role: "system", content: system }];
@@ -18,6 +18,7 @@ export class ChatCompletionsProvider implements LLMProvider {
         out.push({
           role: "assistant",
           content: m.content || null,
+          ...(this.opts.thinking ? { reasoning_content: m.reasoning ?? "" } : {}),
           tool_calls: m.toolCalls?.length
             ? m.toolCalls.map((tc) => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: JSON.stringify(tc.args) } }))
             : undefined,
@@ -28,13 +29,17 @@ export class ChatCompletionsProvider implements LLMProvider {
   }
 
   async *stream(req: StreamRequest): AsyncGenerator<ProviderEvent> {
-    const body = {
+    const body: Record<string, unknown> = {
       model: req.model,
       messages: this.toMessages(req.system, req.messages),
       tools: req.tools.length ? req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.parameters } })) : undefined,
       stream: true,
       stream_options: { include_usage: true },
     };
+    if (this.opts.thinking) {
+      body.thinking = { type: "enabled" };
+      body.reasoning_effort = "high";
+    }
     let res: Response;
     try {
       res = await fetch(`${this.opts.baseUrl.replace(/\/$/, "")}/chat/completions`, {

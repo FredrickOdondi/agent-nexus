@@ -99,9 +99,10 @@ export function redactSettings(s: SpaceSettings): SpaceSettings {
   const { composioApiKey, composioSessionId: _session, composioUserId: _user, ...rest } = s;
   const fromSettings = Boolean(composioApiKey);
   const fromEnv = Boolean(process.env.COMPOSIO_API_KEY);
+  const providerKey = Boolean(apiKey || (s.provider.kind === "deepseek" && process.env.DEEPSEEK_API_KEY));
   return {
     ...rest,
-    provider: { ...provider, hasApiKey: Boolean(apiKey) },
+    provider: { ...provider, hasApiKey: providerKey },
     hasComposioApiKey: fromSettings || fromEnv,
     composioKeySource: fromSettings ? "settings" : fromEnv ? "env" : "none",
   };

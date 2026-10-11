@@ -270,16 +270,19 @@ export class AgentRunner {
         if (text.trim()) out.push({ role: "user", content: text });
       } else if (m.role === "assistant") {
         let text = "";
+        let reasoning = "";
         let calls: { id: string; name: string; args: Record<string, unknown>; result: string }[] = [];
         const flush = () => {
-          if (!text.trim() && calls.length === 0) return;
-          out.push({ role: "assistant", content: text.trim(), toolCalls: calls.length ? calls.map(({ id, name, args }) => ({ id, name, args })) : undefined });
+          if (!text.trim() && calls.length === 0) { reasoning = ""; return; }
+          out.push({ role: "assistant", content: text.trim(), reasoning: reasoning.trim() || undefined, toolCalls: calls.length ? calls.map(({ id, name, args }) => ({ id, name, args })) : undefined });
           for (const c of calls) out.push({ role: "tool", toolCallId: c.id, name: c.name, content: c.result });
           text = "";
+          reasoning = "";
           calls = [];
         };
         for (const p of m.parts) {
-          if (p.type === "text") {
+          if (p.type === "reasoning") reasoning += p.text;
+          else if (p.type === "text") {
             if (calls.length) flush();
             text += p.text;
           } else if (p.type === "tool_call" && !p.serverSide) {
@@ -315,6 +318,7 @@ export class AgentRunner {
         this.sink.status("thinking");
 
         let turnText = "";
+        let turnReasoning = "";
         const pending: { id: string; name: string; args: Record<string, unknown>; index: number }[] = [];
         const serverParts = new Map<string, number>();
         let streamError: string | undefined;
@@ -328,6 +332,7 @@ export class AgentRunner {
               this.sink.appendText(ev.delta);
               break;
             case "reasoning":
+              turnReasoning += ev.delta;
               this.sink.appendReasoning(ev.delta);
               break;
             case "tool_call": {
@@ -370,7 +375,7 @@ export class AgentRunner {
           return { status: this.opts.signal.aborted ? "cancelled" : "complete", text: finalText, toolCalls, turns };
         }
 
-        messages.push({ role: "assistant", content: turnText, toolCalls: pending.map(({ id, name, args }) => ({ id, name, args })) });
+        messages.push({ role: "assistant", content: turnText, reasoning: turnReasoning || undefined, toolCalls: pending.map(({ id, name, args }) => ({ id, name, args })) });
         this.sink.status("tool", pending.map((p) => p.name).join(", "));
 
         const results = await Promise.all(pending.map((p) => this.executeTool(p, services)));
@@ -470,14 +475,14 @@ function safeSummary(fn: () => string): string {
 }
 
 function trimHistory(messages: ProviderMessage[]): ProviderMessage[] {
-  let total = messages.reduce((n, m) => n + ("content" in m ? m.content.length : 0), 0);
+  let total = messages.reduce((n, m) => n + ("content" in m ? m.content.length + ("reasoning" in m ? (m.reasoning?.length ?? 0) : 0) : 0), 0);
   if (total <= MAX_HISTORY_CHARS) return messages;
   const out = [...messages];
   // Keep the first user turn for grounding; drop the oldest middle turns (and dangling tool results).
   let i = 1;
   while (total > MAX_HISTORY_CHARS && i < out.length - 2) {
     const removed = out.splice(i, 1)[0];
-    total -= "content" in removed ? removed.content.length : 0;
+    total -= "content" in removed ? removed.content.length + ("reasoning" in removed ? (removed.reasoning?.length ?? 0) : 0) : 0;
     while (out[i]?.role === "tool" && removed.role === "assistant") {
       const r = out.splice(i, 1)[0];
       total -= r.content.length;

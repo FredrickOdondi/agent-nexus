@@ -3,7 +3,7 @@ import type { JsonSchema } from "../types.js";
 
 export type ProviderMessage =
   | { role: "user"; content: string }
-  | { role: "assistant"; content: string; toolCalls?: { id: string; name: string; args: Record<string, unknown> }[] }
+  | { role: "assistant"; content: string; reasoning?: string; toolCalls?: { id: string; name: string; args: Record<string, unknown> }[] }
   | { role: "tool"; toolCallId: string; name: string; content: string };
 
 export interface ProviderToolSpec {

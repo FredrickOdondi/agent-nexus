@@ -171,7 +171,7 @@ export interface Message {
 
 export type PermissionMode = "ask" | "auto" | "read_only" | "plan";
 
-export type ProviderKind = "xai" | "openai_compatible" | "mock";
+export type ProviderKind = "deepseek" | "xai" | "openai_compatible" | "mock";
 
 export interface ProviderSettings {
   kind: ProviderKind;

@@ -140,10 +140,10 @@ function buildReply(text: string): string {
   const t = text.trim();
   if (!t) return "Say something and I'll help.";
   if (/^(hi|hello|hey|yo)\b/i.test(t)) {
-    return "Hey! I'm **Nimbus**, running in offline demo mode.\n\nI can explore your workspace, search the web, edit files, run commands and plan work. Add an xAI or OpenAI-compatible API key in **Settings → Model** to unlock the real model.\n\nTry:\n- *Explore the codebase*\n- *Search the web for the latest TypeScript release*\n- *Plan a migration from Next.js to Vite*";
+    return "Hey! I'm **Nimbus**, running in offline demo mode.\n\nI can explore your workspace, search the web, edit files, run commands and plan work. Add a DeepSeek API key in **Settings → Model** to unlock the real model.\n\nTry:\n- *Explore the codebase*\n- *Search the web for the latest TypeScript release*\n- *Plan a migration from Next.js to Vite*";
   }
   if (/\?$/.test(t)) {
     return `Good question. In demo mode I can't reason about *"${t.slice(0, 80)}"* with a real model yet, but here's how I'd approach it:\n\n1. **Clarify** the exact outcome you want.\n2. **Gather context** — I'd read the relevant files or search the web.\n3. **Propose** a concrete answer with sources or code.\n\nConnect a model in Settings and ask again — I'll do all of this for real, with citations.`;
   }
-  return `Got it: *"${t.slice(0, 120)}"*.\n\nI'm in **offline demo mode**, so this reply is scripted — but every other part of the product is real: your messages are persisted, synced to all linked devices, and the agent tool loop (shell, files, grep, web search, subagents, memory) is wired up.\n\nOpen **Settings → Model**, paste an API key, and I'll pick this up with a real model.`;
+  return `Got it: *"${t.slice(0, 120)}"*.\n\nI'm in **offline demo mode**, so this reply is scripted — but every other part of the product is real: your messages are persisted, synced to all linked devices, and the agent tool loop (shell, files, grep, web search, subagents, memory) is wired up.\n\nOpen **Settings → Model**, paste a DeepSeek API key, and I'll pick this up with the real model.`;
 }

@@ -4,7 +4,7 @@ import { useStore } from "@/lib/store";
 
 const SUGGESTIONS = [
   { icon: Code2, title: "Explore the codebase", prompt: "Explore the codebase and summarise the architecture, key modules and how they fit together." },
-  { icon: Globe, title: "Research with sources", prompt: "Search the web for the latest news on xAI Grok and summarise the three most important updates with sources." },
+  { icon: Globe, title: "Research with sources", prompt: "Search the web for the latest TypeScript release and summarise what changed, with sources." },
   { icon: Terminal, title: "Run and fix", prompt: "Run the test suite, read any failures, fix them and re-run until green." },
   { icon: ListTodo, title: "Plan a migration", prompt: "Plan a migration of this app from Next.js to Vite + a lightweight Node server. Break it into concrete steps." },
   { icon: Wand2, title: "Generate an image", prompt: "Generate an image of a minimalist app icon: a soft cloud with an electric indigo spark, flat design." },
@@ -43,7 +43,7 @@ export function EmptyState() {
           transition={{ delay: 0.15 }}
           className="mt-4 inline-flex items-center gap-2 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-warning/20"
         >
-          <span className="size-1.5 rounded-full bg-warning" /> Offline demo mode — connect xAI Grok or any OpenAI-compatible model
+          <span className="size-1.5 rounded-full bg-warning" /> Offline demo mode — add a DeepSeek API key in Settings
         </motion.button>
       )}
 

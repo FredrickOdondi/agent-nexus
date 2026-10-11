@@ -9,7 +9,7 @@ import { DEFAULT_MODELS } from "@nimbus/agent-core";
 const EVENT_RETENTION = 20_000;
 
 export const DEFAULT_SETTINGS = (workspacePath: string): SpaceSettings => ({
-  provider: { kind: "mock", baseUrl: DEFAULT_MODELS.xai.baseUrl, model: DEFAULT_MODELS.xai.model, serverTools: true },
+  provider: { kind: "deepseek", baseUrl: DEFAULT_MODELS.deepseek.baseUrl, model: DEFAULT_MODELS.deepseek.model, serverTools: false },
   permissionMode: "ask",
   workspacePath,
   memoryEnabled: true,
@@ -140,7 +140,10 @@ export class Db {
     const base = DEFAULT_SETTINGS(defaultWorkspace);
     if (!r) return base;
     const parsed = JSON.parse(r.json) as Partial<SpaceSettings>;
-    return { ...base, ...parsed, provider: { ...base.provider, ...(parsed.provider ?? {}) } };
+    const provider = { ...base.provider, ...(parsed.provider ?? {}) };
+    // Spaces created before DeepSeek was the default still have the factory demo provider.
+    const untouchedDemo = provider.kind === "mock" && !provider.apiKey && provider.model === "grok-4-1-fast-reasoning";
+    return { ...base, ...parsed, provider: untouchedDemo ? base.provider : provider };
   }
 
   saveSettings(spaceId: string, settings: SpaceSettings) {
