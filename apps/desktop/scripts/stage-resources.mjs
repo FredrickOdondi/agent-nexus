@@ -36,6 +36,14 @@ if (targets.includes("mac")) {
   console.log(`screen helper ${out}`);
 }
 
+if (process.argv.includes("web-icons")) {
+  const webPublic = path.resolve(root, "../web/public");
+  writeFileSync(path.join(webPublic, "icon-192.png"), appIcon(192));
+  writeFileSync(path.join(webPublic, "icon-512.png"), appIcon(512));
+  writeFileSync(path.join(webPublic, "apple-touch-icon.png"), appIcon(180));
+  console.log("wrote web icons");
+}
+
 function appIcon(size) {
   const raw = Buffer.alloc((size * 4 + 1) * size);
   const cx = size / 2;
@@ -52,14 +60,20 @@ function appIcon(size) {
         raw[i] = raw[i + 1] = raw[i + 2] = raw[i + 3] = 0;
         continue;
       }
-      const lift = 1 - y / size;
-      let r = 67 + lift * 28;
-      let g = 56 + lift * 24;
-      let b = 202;
-      if (inLetter(x / size, y / size)) {
-        r = 244;
-        g = 243;
-        b = 241;
+      const t = (x + y) / (size * 2);
+      let r = 141 + (62 - 141) * t;
+      let g = 124 + (207 - 124) * t;
+      let b = 255 + (191 - 255) * t;
+      const nx = x / size;
+      const ny = y / size;
+      if (inEye(nx, ny)) {
+        r = 42;
+        g = 33;
+        b = 88;
+      } else if (inCloud(nx, ny)) {
+        r = 255;
+        g = 255;
+        b = 255;
       }
       raw[i] = r;
       raw[i + 1] = g;
@@ -80,11 +94,21 @@ function appIcon(size) {
   ]);
 }
 
-function inLetter(nx, ny) {
-  const left = nx > 0.34 && nx < 0.44 && ny > 0.3 && ny < 0.7;
-  const right = nx > 0.56 && nx < 0.66 && ny > 0.3 && ny < 0.7;
-  const diag = Math.abs((nx - 0.39) - (ny - 0.3) * 0.55) < 0.045 && ny > 0.3 && ny < 0.7 && nx > 0.34 && nx < 0.66;
-  return left || right || diag;
+function inBlob(nx, ny, cx, cy, rx, ry) {
+  const dx = (nx - cx) / rx;
+  const dy = (ny - cy) / ry;
+  return dx * dx + dy * dy <= 1;
+}
+
+function inCloud(nx, ny) {
+  return inBlob(nx, ny, 0.38, 0.52, 0.14, 0.14)
+    || inBlob(nx, ny, 0.54, 0.44, 0.16, 0.16)
+    || inBlob(nx, ny, 0.68, 0.52, 0.12, 0.12)
+    || inBlob(nx, ny, 0.52, 0.58, 0.22, 0.14);
+}
+
+function inEye(nx, ny) {
+  return inBlob(nx, ny, 0.45, 0.54, 0.018, 0.024) || inBlob(nx, ny, 0.58, 0.53, 0.018, 0.024);
 }
 
 function chunk(type, data) {

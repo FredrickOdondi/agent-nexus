@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { TOKEN_KEY, useStore } from "@/lib/store";
 import { openExternal, reserveExternalTab } from "@/lib/platform";
 import { cn } from "@/lib/utils";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { Field, Section, ToggleRow } from "../SettingsDialog";
 
 interface AppsResponse {
@@ -177,7 +178,7 @@ export function AppsTab() {
           </div>
         )}
         {loading && list.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading apps…</div>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground"><NimbusMark state="loading" size={28} />Loading apps…</div>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nothing matches “{query.trim()}”. Connect it by slug below.</p>
         ) : (
@@ -233,7 +234,7 @@ function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string;
                   <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{app.connected ? "Connected" : app.noAuth ? "Not connected · no sign-in required" : app.blurb}</span>
                 </span>
                 <span className="flex w-[4.75rem] shrink-0 items-center justify-end">
-                  {pending ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : app.connected ? <Check className="size-5 text-success" aria-label="Connected" /> : <span className="text-[15px] font-semibold whitespace-nowrap text-primary">Connect</span>}
+                  {pending ? <NimbusMark state="loading" size={22} /> : app.connected ? <Check className="size-5 text-success" aria-label="Connected" /> : <span className="text-[15px] font-semibold whitespace-nowrap text-primary">Connect</span>}
                 </span>
               </button>
             </li>

@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { cn } from "@/lib/utils";
 import { Code2, Globe, ListTodo, Sparkles, Terminal, Wand2 } from "lucide-react";
 import { useStore } from "@/lib/store";
@@ -25,8 +26,8 @@ export function EmptyState() {
         <motion.div className="absolute right-[12%] bottom-[18%] size-80 rounded-full bg-chart-2/15 blur-3xl" animate={{ x: [0, -24, 0], y: [0, 26, 0] }} transition={{ duration: 17, repeat: Infinity, ease: "easeInOut" }} />
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} className="mb-6 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-chart-2 text-xl font-bold text-primary-foreground elevation-3 animate-float">
-        N
+      <motion.div initial={{ opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} className="mb-6">
+        <NimbusMark size={72} />
       </motion.div>
       <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, type: "spring", stiffness: 260, damping: 26 }} className="text-center text-xl font-semibold tracking-tight sm:text-3xl">
         What should we build today?

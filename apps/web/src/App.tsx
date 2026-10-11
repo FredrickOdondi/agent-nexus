@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { LinkDevice } from "@/components/onboarding/LinkDevice";
+import { NimbusLoader } from "@/components/brand/NimbusMark";
 import { SignIn } from "@/components/onboarding/SignIn";
 import { forgetTokenForUser, migratableToken, prepareCache, saveTokenForUser, tokenForUser, TOKEN_KEY } from "@/lib/account";
 import { clearCache } from "@/lib/db";
@@ -163,7 +164,7 @@ export default function App() {
         <AnimatePresence initial={false} mode="sync">
           {visual === "loading" ? (
             <Stage key="loading" reduced={reducedMotion} enter="fade" exit="fade" className="z-10">
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Checking your account…</div>
+              <div className="flex h-full items-center justify-center"><NimbusLoader label="Checking your account…" /></div>
             </Stage>
           ) : visual === "signin" ? (
             <Stage key="signin" reduced={reducedMotion} enter="fade" exit="through" className="signin-stage z-10">

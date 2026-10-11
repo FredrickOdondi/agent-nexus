@@ -13,6 +13,7 @@ import { accountFromSession } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { isElectron, isMac } from "@/lib/platform";
 import { cn } from "@/lib/utils";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { ThemeToggle } from "./ThemeToggle";
 import { InstallHint } from "./InstallHint";
 
@@ -59,7 +60,7 @@ export function Sidebar({ onNavigate, variant = "sidebar" }: { onNavigate?: () =
         </div>
       ) : (
         <div className={cn("flex items-center gap-2 px-3 pt-3 pb-2", isElectron && isMac && "drag-region pt-10")}>
-          <div className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-chart-2 text-xs font-bold text-primary-foreground elevation-1">N</div>
+          <NimbusMark size={28} />
           <span className="font-semibold tracking-tight">Nimbus</span>
           <span className={cn("ml-1 size-1.5 rounded-full", connection === "online" ? "bg-success" : connection === "connecting" ? "bg-warning animate-pulse" : "bg-destructive")} title={connection} />
           <div className="ml-auto flex items-center gap-0.5 no-drag">

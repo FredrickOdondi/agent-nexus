@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Laptop, Loader2, LogOut, Monitor, Pencil, QrCode, RefreshCw, Smartphone, Trash2 } from "lucide-react";
+import { Laptop, LogOut, Monitor, Pencil, QrCode, RefreshCw, Smartphone, Trash2 } from "lucide-react";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { toast } from "sonner";
 import { formatRelative } from "@nimbus/shared";
 import { Badge } from "@/components/ui/badge";
@@ -53,7 +54,7 @@ export function DevicesTab() {
                 <motion.img key={ticket.code} src={ticket.qr} alt={`Pairing QR for code ${ticket.code}`} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="size-full" />
               ) : (
                 <motion.button key="placeholder" type="button" onClick={createTicket} disabled={loading} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex size-full flex-col items-center justify-center gap-2 rounded-xl text-neutral-500 transition-colors hover:bg-neutral-100">
-                  {loading ? <Loader2 className="size-6 animate-spin" /> : <QrCode className="size-8" />}<span className="text-xs font-medium">Generate QR code</span>
+                  {loading ? <NimbusMark state="loading" size={36} /> : <QrCode className="size-8" />}<span className="text-xs font-medium">Generate QR code</span>
                 </motion.button>
               )}
             </AnimatePresence>

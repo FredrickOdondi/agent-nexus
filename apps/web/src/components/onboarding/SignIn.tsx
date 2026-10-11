@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
-import { HardDrive, Loader2, Smartphone, UserRound } from "lucide-react";
+import { HardDrive, Smartphone, UserRound } from "lucide-react";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
@@ -79,8 +80,8 @@ export function SignIn({ leaving = false }: { leaving?: boolean }) {
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
           className="m-auto w-full max-w-sm py-8"
         >
-          <div className="mb-8 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-chart-2 text-lg font-bold text-primary-foreground elevation-2">
-            N
+          <div className="mb-8">
+            <NimbusMark size={56} />
           </div>
           <h1 className="text-[1.75rem] font-semibold tracking-tight">Sign in</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -94,7 +95,7 @@ export function SignIn({ leaving = false }: { leaving?: boolean }) {
             disabled={pending || leaving}
             onClick={() => void start()}
           >
-            {pending || leaving ? <Loader2 className="animate-spin" /> : <GoogleMark />}
+            {pending || leaving ? <NimbusMark state="loading" size={20} /> : <GoogleMark />}
             {pending ? "Opening Google…" : leaving ? "Opening your workspace…" : "Continue with Google"}
           </Button>
           <p className="mt-3 text-center text-xs text-muted-foreground">Opens Google in this browser, then returns here.</p>
@@ -114,7 +115,7 @@ export function SignIn({ leaving = false }: { leaving?: boolean }) {
                 className="min-h-20 font-mono text-base"
               />
               <Button type="submit" className="h-12 w-full text-base" disabled={finishing || redirectUrl.trim().length === 0}>
-                {finishing ? <Loader2 className="animate-spin" /> : null}
+                {finishing ? <NimbusMark state="loading" size={18} /> : null}
                 {finishing ? "Finishing sign-in…" : "Finish sign-in"}
               </Button>
             </form>
@@ -149,7 +150,7 @@ function DesktopStage() {
       </div>
 
       <div className="relative flex items-center gap-3">
-        <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-chart-2 text-sm font-bold text-primary-foreground elevation-1">N</div>
+        <NimbusMark size={36} />
         <span className="text-sm font-semibold tracking-tight">Nimbus</span>
       </div>
 
@@ -201,7 +202,7 @@ function WorkspacePreview() {
         <div className="grid h-48 grid-cols-[10.5rem_1fr] [@media(min-height:900px)]:h-60 [@media(min-height:900px)]:grid-cols-[12rem_1fr]">
           <div className="flex flex-col border-r bg-sidebar p-3">
             <div className="flex items-center gap-2 px-1 pb-3">
-              <span className="flex size-5 items-center justify-center rounded-md bg-gradient-to-br from-primary to-chart-2 text-[10px] font-bold text-primary-foreground">N</span>
+              <NimbusMark state="static" size={18} />
               <span className="text-xs font-semibold">Nimbus</span>
               <span className="ml-auto size-1.5 rounded-full bg-success" />
             </div>

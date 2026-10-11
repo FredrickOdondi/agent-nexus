@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ApprovalCard } from "./ApprovalCard";
 import { Markdown } from "./Markdown";
 import { QuestionCard } from "./QuestionCard";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { ToolCallCard } from "./ToolCallCard";
 
 const spring = { type: "spring", stiffness: 420, damping: 34, mass: 0.8 } as const;
@@ -53,7 +54,7 @@ function AssistantMessage({ message, isLast, approvals }: { message: Message; is
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={spring} className="group flex gap-3 py-2">
-      <div className="mt-1 hidden size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-chart-2 text-[11px] font-bold text-primary-foreground elevation-1 sm:flex">N</div>
+      <div className="mt-1 hidden shrink-0 sm:block"><NimbusMark state="static" size={28} /></div>
       <div className="min-w-0 flex-1">
         {parts.length === 0 && streaming && <Thinking />}
         {parts.map((p, i) => (
@@ -159,10 +160,8 @@ function Reasoning({ text, live, durationMs }: { text: string; live: boolean; du
 
 export function Thinking() {
   return (
-    <div className="flex h-8 items-center gap-1.5 pl-1" aria-label="Nimbus is thinking">
-      {[0, 1, 2].map((i) => (
-        <motion.span key={i} className="size-1.5 rounded-full bg-muted-foreground" animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }} transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.14, ease: "easeInOut" }} />
-      ))}
+    <div className="flex h-8 items-center pl-0.5" aria-label="Nimbus is thinking">
+      <NimbusMark state="loading" size={26} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Loader2, Monitor, ShieldCheck, Smartphone, Wifi } from "lucide-react";
+import { ArrowRight, Monitor, ShieldCheck, Smartphone, Wifi } from "lucide-react";
+import { NimbusLoader, NimbusMark } from "@/components/brand/NimbusMark";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,7 +143,7 @@ export function LinkDevice({ initialCode, onLinked, onPhase }: Props) {
 
       <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 240, damping: 26 }} className="w-full max-w-md p-1 text-card-foreground sm:rounded-3xl sm:border sm:bg-card/80 sm:p-8 sm:glass sm:elevation-3">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-chart-2 text-lg font-bold text-primary-foreground elevation-2">N</div>
+          <NimbusMark size={44} />
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Nimbus</h1>
             <p className="text-xs text-muted-foreground">Your agent, on every device</p>
@@ -158,8 +159,7 @@ export function LinkDevice({ initialCode, onLinked, onPhase }: Props) {
             </motion.div>
           ) : phase === "probing" || phase === "done" ? (
             <motion.div key="probing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-8 text-center">
-              <Loader2 className="size-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">{isElectron ? "Starting your local agent…" : "Looking for a Nimbus server on this machine…"}</p>
+              <NimbusLoader label={isElectron ? "Starting your local agent…" : "Looking for a Nimbus server on this machine…"} />
             </motion.div>
           ) : (
             <motion.div key="code" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-6">
@@ -209,7 +209,7 @@ export function LinkDevice({ initialCode, onLinked, onPhase }: Props) {
               </div>
 
               <Button className="h-12 w-full text-base" size="lg" disabled={phase === "claiming" || !/^\d{6}$/.test(digits.join(""))} onClick={() => claim(digits.join(""))}>
-                {phase === "claiming" ? <Loader2 className="animate-spin" /> : <ArrowRight />}
+                {phase === "claiming" ? <NimbusMark state="loading" size={18} /> : <ArrowRight />}
                 {phase === "claiming" ? "Linking…" : "Link device"}
               </Button>
 
