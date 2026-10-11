@@ -49,7 +49,7 @@ To build the Windows installer from a Mac, in the same folder:
 pnpm desktop:dist:win
 ```
 
-The setup program is `apps/desktop/release/Nimbus Setup 0.1.0.exe` (64-bit Windows) and `apps/desktop/release/Nimbus Setup 0.1.0-arm64.exe` (Windows on ARM). Send the first file to a normal Windows PC. The person runs it and follows the installer.
+The setup program is `apps/desktop/release/Nimbus Setup 0.1.0.exe`. It installs on 64-bit Windows and on Windows on ARM. The person runs that file and follows the installer.
 
 GitHub Actions can build both as well: the Desktop installers workflow, run by hand or by pushing a `v*` tag. Download `Nimbus-*.dmg` or `Nimbus Setup *.exe` from the workflow artifacts.
 
