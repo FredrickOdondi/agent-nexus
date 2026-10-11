@@ -39,6 +39,28 @@ export async function supabaseAccessToken(): Promise<string> {
   return token;
 }
 
+/** Pull the one-time `code` out of the loopback address Supabase opened on the phone. */
+export function authCodeFromRedirect(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const code = new URL(trimmed).searchParams.get("code");
+    if (code) return code;
+  } catch {
+    /* a bare code or a partial address */
+  }
+  const match = /(?:^|[?&#])code=([^&\s]+)/.exec(trimmed);
+  if (match?.[1]) return decodeURIComponent(match[1]);
+  if (/^[0-9a-f-]{32,}$/i.test(trimmed)) return trimmed;
+  return null;
+}
+
+/** Finish a Google sign-in whose code landed on 127.0.0.1 instead of this page. */
+export async function finishSignInWithCode(code: string): Promise<void> {
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) throw error;
+}
+
 export async function signInWithGoogle(): Promise<void> {
   if (location.hash) sessionStorage.setItem("nimbus.returnHash", location.hash);
   const { error } = await supabase.auth.signInWithOAuth({

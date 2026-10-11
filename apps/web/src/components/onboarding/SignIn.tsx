@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { signInWithGoogle } from "@/lib/supabase";
+import { authCodeFromRedirect, finishSignInWithCode, signInWithGoogle } from "@/lib/supabase";
 
 export function SignIn() {
   const [pending, setPending] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [redirectUrl, setRedirectUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,6 +37,26 @@ export function SignIn() {
 
   const redirectHint = error && /redirect/i.test(error);
   const onPhone = location.hostname !== "localhost" && location.hostname !== "127.0.0.1";
+
+  async function finish(event: FormEvent) {
+    event.preventDefault();
+    const code = authCodeFromRedirect(redirectUrl);
+    if (!code) {
+      setError("Paste the full address from the phone, the one that starts with http://127.0.0.1:47830/?code=");
+      return;
+    }
+    setFinishing(true);
+    setError(null);
+    try {
+      await finishSignInWithCode(code);
+    } catch (e) {
+      setFinishing(false);
+      const message = e instanceof Error ? e.message : "Could not finish sign-in";
+      setError(/verifier|code challenge|invalid|expired/i.test(message)
+        ? "That sign-in expired, or this is a different browser than the one that opened Google. Stay on this page, tap Continue with Google, then paste the new address."
+        : message);
+    }
+  }
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-5 py-10 safe-top safe-bottom">
@@ -63,9 +86,24 @@ export function SignIn() {
         </Button>
 
         {onPhone && (
-          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Google must return to <span className="font-mono break-all text-foreground">{location.origin}/</span>. If it opens 127.0.0.1, the phone is trying to reach itself and the page will not load. In Supabase, open Authentication → URL configuration and add <span className="font-mono break-all">{location.origin}/**</span> under Redirect URLs, then sign in again from this page.
-          </p>
+          <form onSubmit={(event) => void finish(event)} className="mt-4 space-y-3">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Google is sending this phone to 127.0.0.1, which is the computer, so that page cannot open. Copy the whole address from the phone and paste it here. Stay in this same browser.
+            </p>
+            <Textarea
+              value={redirectUrl}
+              onChange={(event) => setRedirectUrl(event.target.value)}
+              placeholder="http://127.0.0.1:47830/?code=…"
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Address from the phone"
+              className="min-h-20 font-mono text-base"
+            />
+            <Button type="submit" className="h-12 w-full text-base" disabled={finishing || redirectUrl.trim().length === 0}>
+              {finishing ? <Loader2 className="animate-spin" /> : null}
+              {finishing ? "Finishing sign-in…" : "Finish sign-in"}
+            </Button>
+          </form>
         )}
 
         {error && (

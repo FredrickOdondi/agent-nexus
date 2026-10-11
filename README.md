@@ -60,7 +60,7 @@ The Supabase project already has Google enabled. After Google, Supabase returns 
 - `http://10.*.*.*:47830/**`
 - `http://172.*.*.*:47830/**`
 
-The Site URL can stay `http://127.0.0.1:47830` for this computer. The phone uses the Wi‑Fi patterns above.
+The Site URL can stay `http://127.0.0.1:47830` for this computer. The phone uses the Wi‑Fi patterns above. Until that list matches, the phone can paste the `127.0.0.1` address into the sign-in page on the Wi‑Fi address and finish there.
 
 The Google Cloud client’s redirect URI stays `https://<project-ref>.supabase.co/auth/v1/callback`.
 
