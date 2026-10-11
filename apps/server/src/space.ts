@@ -41,39 +41,50 @@ export class SpaceService {
   }
 
   getConversation(id: string) {
-    return this.db.getConversation(id);
+    const c = this.db.getConversation(id);
+    return c && c.spaceId === this.spaceId ? c : null;
   }
 
   upsertConversation(c: Conversation) {
-    this.db.upsertConversation(c);
-    this.emit({ type: "conversation.upsert", conversation: c });
+    const existing = this.db.getConversation(c.id);
+    if (existing && existing.spaceId !== this.spaceId) throw new Error("Conversation not found");
+    const next = { ...c, spaceId: this.spaceId };
+    this.db.upsertConversation(next);
+    this.emit({ type: "conversation.upsert", conversation: next });
   }
 
   deleteConversation(id: string) {
+    if (!this.getConversation(id)) return;
     this.db.deleteConversation(id);
     this.emit({ type: "conversation.delete", conversationId: id });
   }
 
   // ---- messages
   listMessages(conversationId: string): Message[] {
+    if (!this.getConversation(conversationId)) return [];
     return this.db.listMessages(conversationId);
   }
 
   getMessage(id: string) {
-    return this.db.getMessage(id);
+    const m = this.db.getMessage(id);
+    if (!m || !this.getConversation(m.conversationId)) return null;
+    return m;
   }
 
   upsertMessage(m: Message) {
+    if (!this.getConversation(m.conversationId)) throw new Error("Conversation not found");
     this.db.upsertMessage(this.spaceId, m);
     this.emit({ type: "message.upsert", message: m });
   }
 
   deleteMessage(conversationId: string, id: string) {
+    if (!this.getConversation(conversationId)) return;
     this.db.deleteMessage(id);
     this.emit({ type: "message.delete", messageId: id, conversationId });
   }
 
   deleteMessagesFrom(conversationId: string, createdAt: number) {
+    if (!this.getConversation(conversationId)) return;
     for (const id of this.db.deleteMessagesFrom(conversationId, createdAt)) {
       this.emit({ type: "message.delete", messageId: id, conversationId });
     }

@@ -23,7 +23,7 @@ pnpm install
 pnpm dev
 ```
 
-That builds the shared packages, starts the server on [http://127.0.0.1:47831](http://127.0.0.1:47831), and the web app on [http://127.0.0.1:47830](http://127.0.0.1:47830). Sign in with Google, then this computer links itself. A phone on the same Wi-Fi signs in with the same Google account and enters the pairing code.
+That builds the shared packages, starts the server on [http://127.0.0.1:47831](http://127.0.0.1:47831), and the web app on [http://127.0.0.1:47830](http://127.0.0.1:47830). Sign in with Google, then this computer links itself. A phone on the same Wi-Fi signs in with the same Google account and enters the pairing code. A different Google account gets its own chats.
 
 Desktop window (with `pnpm dev` already running):
 
@@ -49,13 +49,14 @@ Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Device
 
 ## Sign in
 
-Nimbus asks for Google through Supabase before it links a device. Use the same Google account on every device. **Settings → Account** shows who is signed in, and signing out only disconnects that device — chats stay on the computer.
+Nimbus asks for Google through Supabase before it links a device. Each Google account has its own chats, settings, and devices on this computer. User A cannot open user B’s activity. Use the same Google account on the phone that you used on the computer that showed the pairing code. **Settings → Account** shows who is signed in. Signing out disconnects this browser; the chats stay on the computer for that account.
 
-The Supabase project already has Google enabled. If Google sends you back to the wrong page, open the project’s Authentication → URL configuration and allow:
+The Supabase project already has Google enabled. If a phone lands on a localhost address after Google, open the project’s Authentication → URL configuration, set the Site URL to `http://127.0.0.1:47830`, and allow:
 
 - `http://127.0.0.1:47830/**`
 - `http://localhost:47830/**`
 - `http://*.local:47830/**`
+- `http://**:47830/**`
 
 The Google Cloud client’s redirect URI stays `https://<project-ref>.supabase.co/auth/v1/callback`.
 

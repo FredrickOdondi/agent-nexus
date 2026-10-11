@@ -9,8 +9,10 @@ import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { LinkDevice } from "@/components/onboarding/LinkDevice";
 import { SignIn } from "@/components/onboarding/SignIn";
+import { forgetTokenForUser, migratableToken, prepareCache, saveTokenForUser, tokenForUser, TOKEN_KEY } from "@/lib/account";
+import { clearCache } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
-import { TOKEN_KEY, useStore } from "@/lib/store";
+import { useStore } from "@/lib/store";
 import { supabaseAccessToken } from "@/lib/supabase";
 import { isElectron, isMac, isStandalonePwa } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -35,10 +37,12 @@ function readPairCode(): string | undefined {
 
 export default function App() {
   const { ready, session } = useAuth();
-  const [linked, setLinked] = useState(() => Boolean(localStorage.getItem(TOKEN_KEY)));
+  const userId = session?.user.id ?? null;
+  const [linked, setLinked] = useState(false);
   const [pairCode, setPairCode] = useState(readPairCode);
-  const [accountGate, setAccountGate] = useState<"checking" | "ok" | "mismatch">(() => (localStorage.getItem(TOKEN_KEY) ? "checking" : "ok"));
-  const [mismatch, setMismatch] = useState<string | null>(null);
+  const [accountGate, setAccountGate] = useState<"checking" | "ready" | "error">("checking");
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountTry, setAccountTry] = useState(0);
   const init = useStore((s) => s.init);
   const signOut = useStore((s) => s.signOut);
 
@@ -49,45 +53,72 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!session || !localStorage.getItem(TOKEN_KEY)) {
-      setAccountGate("ok");
+    if (!userId) {
+      setLinked(false);
+      setAccountGate(ready ? "ready" : "checking");
       return;
     }
     let cancelled = false;
+    setLinked(false);
     setAccountGate("checking");
+    setAccountError(null);
+    useStore.getState().resetLocal();
     (async () => {
-      try {
-        const access = await supabaseAccessToken();
-        const res = await fetch("/api/account/claim", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY) ?? ""}`, "x-supabase-token": access },
-        });
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        if (cancelled) return;
-        if (res.status === 403) {
-          setMismatch(body.error || "This Nimbus belongs to a different Google account.");
-          setAccountGate("mismatch");
-          return;
+      await prepareCache(userId);
+      let token = tokenForUser(userId);
+      const legacy = token ? null : migratableToken(userId);
+      const candidate = token ?? legacy;
+      if (candidate) {
+        try {
+          const access = await supabaseAccessToken();
+          const res = await fetch("/api/account/claim", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${candidate}`, "x-supabase-token": access },
+          });
+          if (cancelled) return;
+          if (res.ok) {
+            saveTokenForUser(userId, candidate);
+            token = candidate;
+          } else if (res.status === 401 || res.status === 403) {
+            forgetTokenForUser(userId);
+            localStorage.removeItem(TOKEN_KEY);
+            token = null;
+          } else if (!token) {
+            setAccountError("Could not confirm this Google account. Check the connection and try again.");
+            setAccountGate("error");
+            return;
+          }
+        } catch {
+          if (cancelled) return;
+          if (!token) {
+            setAccountError("Could not confirm this Google account. Check the connection and try again.");
+            setAccountGate("error");
+            return;
+          }
         }
-        setAccountGate("ok");
-      } catch {
-        if (!cancelled) setAccountGate("ok");
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
       }
+      if (cancelled) return;
+      if (token) localStorage.setItem(TOKEN_KEY, token);
+      else await clearCache();
+      setLinked(Boolean(token));
+      setAccountGate("ready");
     })();
     return () => { cancelled = true; };
-  }, [session]);
+  }, [userId, ready, accountTry]);
 
   useEffect(() => {
-    if (linked && accountGate === "ok") void init();
+    if (linked && accountGate === "ready") void init();
   }, [linked, accountGate, init]);
 
   // A fresh QR scan while already linked re-links as a new device.
   const showLink = !linked || Boolean(pairCode);
 
-  let screen: "loading" | "signin" | "mismatch" | "link" | "app" = "app";
-  if (!ready || (session && linked && accountGate === "checking" && !pairCode)) screen = "loading";
+  let screen: "loading" | "signin" | "error" | "link" | "app" = "app";
+  if (!ready || (session && accountGate === "checking")) screen = "loading";
   else if (!session) screen = "signin";
-  else if (accountGate === "mismatch" && !pairCode) screen = "mismatch";
+  else if (accountGate === "error") screen = "error";
   else if (showLink) screen = "link";
 
   return (
@@ -101,11 +132,12 @@ export default function App() {
           <motion.div key="signin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }}>
             <SignIn />
           </motion.div>
-        ) : screen === "mismatch" ? (
-          <motion.div key="mismatch" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 text-center">
-            <h1 className="text-xl font-semibold tracking-tight">Different Google account</h1>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{mismatch}</p>
-            <button type="button" onClick={() => void signOut()} className="mt-6 h-12 rounded-xl bg-primary px-5 text-base font-medium text-primary-foreground">Sign out</button>
+        ) : screen === "error" ? (
+          <motion.div key="account-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 text-center">
+            <h1 className="text-xl font-semibold tracking-tight">Couldn’t open your account</h1>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{accountError}</p>
+            <button type="button" onClick={() => setAccountTry((n) => n + 1)} className="mt-6 h-12 rounded-xl bg-primary px-5 text-base font-medium text-primary-foreground">Try again</button>
+            <button type="button" onClick={() => void signOut()} className="mt-3 h-12 rounded-xl px-5 text-base font-medium text-muted-foreground">Sign out</button>
           </motion.div>
         ) : screen === "link" ? (
           <motion.div key="link" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }}>

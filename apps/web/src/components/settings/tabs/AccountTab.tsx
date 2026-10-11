@@ -12,7 +12,7 @@ export function AccountTab() {
 
   return (
     <div>
-      <Section title="Google account" description="This account is how Nimbus knows the phone and the computer belong to you. Chats stay on this computer.">
+      <Section title="Google account" description="Chats, settings, and connected apps belong to this Google account. A different account on this computer gets its own empty workspace and cannot open these chats.">
         {account ? (
           <div className="flex items-center gap-3 rounded-2xl border bg-surface px-3.5 py-3">
             {account.avatar ? (

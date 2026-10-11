@@ -16,12 +16,13 @@ import type {
 } from "@nimbus/shared";
 import { newId } from "@nimbus/shared";
 import { toast } from "sonner";
+import { TOKEN_KEY, wipeLocalAccount } from "./account";
 import { cache, getMeta, setMeta } from "./db";
 import { SyncClient, type ConnectionState } from "./client";
 import { defaultDeviceName } from "./platform";
 import { supabase } from "./supabase";
 
-export const TOKEN_KEY = "nimbus.token";
+export { TOKEN_KEY };
 export const DEVICE_NAME_KEY = "nimbus.deviceName";
 
 interface UiState {
@@ -61,6 +62,7 @@ interface State extends UiState {
   showSettingsRoot(): void;
   closeSettings(): void;
   setDraftMode(mode: Conversation["mode"]): void;
+  resetLocal(): void;
   signOut(): Promise<void>;
 }
 
@@ -191,12 +193,35 @@ export const useStore = create<State>((set, get) => ({
   closeSettings: () => set({ settingsOpen: false }),
   setDraftMode: (mode) => set({ draftMode: mode }),
 
+  resetLocal() {
+    client?.close();
+    client = null;
+    set({
+      connection: "connecting",
+      deviceId: null,
+      spaceId: null,
+      seq: 0,
+      bootstrapped: false,
+      conversations: [],
+      messages: {},
+      loaded: {},
+      runs: {},
+      approvals: [],
+      settings: null,
+      devices: [],
+      tools: [],
+      skills: [],
+      selectedId: null,
+    });
+  },
+
   async signOut() {
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user.id;
     client?.close();
     client = null;
     await supabase.auth.signOut().catch(() => {});
-    localStorage.removeItem(TOKEN_KEY);
-    await Promise.all([cache.conversations.clear(), cache.messages.clear(), cache.meta.clear()]).catch(() => {});
+    await wipeLocalAccount(userId);
     location.hash = "";
     location.reload();
   },

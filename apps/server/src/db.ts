@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Conversation, Device, Message, Platform, SpaceSettings } from "@nimbus/shared";
@@ -53,32 +53,20 @@ export class Db {
       CREATE TABLE IF NOT EXISTS accounts (
         space_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, email TEXT, name TEXT, avatar TEXT
       );
+      CREATE UNIQUE INDEX IF NOT EXISTS accounts_user ON accounts(user_id);
       CREATE TABLE IF NOT EXISTS todos (conversation_id TEXT PRIMARY KEY, json TEXT NOT NULL);
     `);
   }
 
   // ---- spaces & devices -------------------------------------------------
 
-  ensurePrimarySpace(defaultWorkspace: string): { spaceId: string; primaryToken: string | null } {
-    const row = this.db.prepare("SELECT id FROM spaces ORDER BY created_at LIMIT 1").get() as { id: string } | undefined;
-    if (row) return { spaceId: row.id, primaryToken: null };
-    const spaceId = newId("space");
-    this.db.prepare("INSERT INTO spaces (id, name, created_at) VALUES (?, ?, ?)").run(spaceId, "Personal", Date.now());
-    this.db.prepare("INSERT INTO settings (space_id, json) VALUES (?, ?)").run(spaceId, JSON.stringify(DEFAULT_SETTINGS(defaultWorkspace)));
-    return { spaceId, primaryToken: null };
+  createSpace(spaceId: string, name: string, workspacePath: string) {
+    this.db.prepare("INSERT INTO spaces (id, name, created_at) VALUES (?, ?, ?)").run(spaceId, name.slice(0, 80), Date.now());
+    this.db.prepare("INSERT INTO settings (space_id, json) VALUES (?, ?)").run(spaceId, JSON.stringify(DEFAULT_SETTINGS(workspacePath)));
   }
 
-  /** The primary (desktop host) device token, created on first run and persisted hashed. */
-  getOrCreatePrimaryDevice(spaceId: string, name: string, platform: Platform, tokenFile: { read(): string | null; write(t: string): void }): { device: Device; token: string } {
-    const existingToken = tokenFile.read();
-    if (existingToken) {
-      const dev = this.deviceByToken(existingToken);
-      if (dev) return { device: dev, token: existingToken };
-    }
-    const token = randomBytes(32).toString("hex");
-    const device = this.createDevice(spaceId, name, platform, token, true);
-    tokenFile.write(token);
-    return { device, token };
+  hasPrimaryDevice(spaceId: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM devices WHERE space_id = ? AND is_primary = 1").get(spaceId));
   }
 
   createDevice(spaceId: string, name: string, platform: Platform, token: string, primary = false): Device {
@@ -142,14 +130,27 @@ export class Db {
     return r.space_id;
   }
 
+  accountByUser(userId: string): AccountRecord | null {
+    const r = this.db.prepare("SELECT space_id, user_id, email, name, avatar FROM accounts WHERE user_id = ?").get(userId) as AccountSql | undefined;
+    return r ? rowToAccount(r) : null;
+  }
+
+  accountBySpace(spaceId: string): AccountRecord | null {
+    const r = this.db.prepare("SELECT space_id, user_id, email, name, avatar FROM accounts WHERE space_id = ?").get(spaceId) as AccountSql | undefined;
+    return r ? rowToAccount(r) : null;
+  }
+
   /**
-   * Attach this Google user to the space. The first account wins.
-   * Returns an error message when a different account already owns it.
+   * Bind this Google user to this space.
+   * A space keeps the first account that claimed it, and a user keeps the first space they claimed.
+   * Returns an error message when the bind would cross accounts.
    */
-  claimAccount(spaceId: string, user: { id: string; email: string | null; name: string | null; avatar: string | null }): string | null {
-    const existing = this.db.prepare("SELECT user_id, email FROM accounts WHERE space_id = ?").get(spaceId) as { user_id: string; email: string | null } | undefined;
-    if (existing && existing.user_id !== user.id) {
-      const who = existing.email?.trim() || "another Google account";
+  bindAccount(spaceId: string, user: { id: string; email: string | null; name: string | null; avatar: string | null }): string | null {
+    const byUser = this.accountByUser(user.id);
+    if (byUser && byUser.spaceId !== spaceId) return "This Google account already has its own Nimbus. Sign in on this computer to open it.";
+    const bySpace = this.accountBySpace(spaceId);
+    if (bySpace && bySpace.userId !== user.id) {
+      const who = bySpace.email?.trim() || "another Google account";
       return `This Nimbus is signed in as ${who}. Use that account.`;
     }
     this.db.prepare(
@@ -260,4 +261,24 @@ export class Db {
 
 function rowToDevice(r: any): Device {
   return { id: r.id, spaceId: r.space_id, name: r.name, platform: r.platform, primary: Boolean(r.is_primary), createdAt: r.created_at, lastSeenAt: r.last_seen_at };
+}
+
+export interface AccountRecord {
+  spaceId: string;
+  userId: string;
+  email: string | null;
+  name: string | null;
+  avatar: string | null;
+}
+
+interface AccountSql {
+  space_id: string;
+  user_id: string;
+  email: string | null;
+  name: string | null;
+  avatar: string | null;
+}
+
+function rowToAccount(r: AccountSql): AccountRecord {
+  return { spaceId: r.space_id, userId: r.user_id, email: r.email, name: r.name, avatar: r.avatar };
 }

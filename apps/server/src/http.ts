@@ -10,7 +10,7 @@ import { composioConnect, composioStatus } from "./composio-host.js";
 import { verifySupabaseAccessToken, type SupabaseAccount } from "./supabase-auth.js";
 import type { Db } from "./db.js";
 import type { ServerConfig } from "./config.js";
-import type { SpaceService } from "./space.js";
+import type { SpaceRegistry } from "./registry.js";
 
 /** Origin a phone should open. In dev that is the Vite port; in production the server serves the UI itself. */
 export function uiOrigin(cfg: ServerConfig, host: string): string {
@@ -53,7 +53,7 @@ async function googleUser(header: string | undefined): Promise<SupabaseAccount |
   return verifySupabaseAccessToken(header);
 }
 
-export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, primaryToken: string, startedAt: number) {
+export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry, startedAt: number) {
   const app = new Hono<{ Bindings: { remote?: string }; Variables: { remote?: string } }>();
   app.use("*", async (c, next) => {
     if (c.env?.remote) c.set("remote", c.env.remote);
@@ -66,16 +66,18 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     return c.json(info);
   });
 
-  /** Loopback-only: hands the primary device token to the desktop shell / local browser. */
+  /** Loopback-only: opens this Google account's space and returns its desktop token. */
   app.get("/api/bootstrap", async (c) => {
     const remote = c.get("remote");
     if (!isLoopback(remote)) return c.json({ error: "bootstrap is only available from this machine" }, 403);
     const user = await googleUser(c.req.header("x-supabase-token"));
     if (!user) return c.json({ error: "Sign in with Google first" }, 401);
-    const conflict = db.claimAccount(space.spaceId, user);
-    if (conflict) return c.json({ error: conflict }, 403);
-    const dev = db.deviceByToken(primaryToken);
-    return c.json({ token: primaryToken, deviceId: dev?.id, spaceId: space.spaceId });
+    try {
+      return c.json(registry.ensureUserSpace(user));
+    } catch (error) {
+      console.error("[nimbus] bootstrap failed", error instanceof Error ? error.message : "unknown");
+      return c.json({ error: "Could not open your account" }, 500);
+    }
   });
 
   /** Create a pairing ticket (QR + 6-digit code). Requires a valid device token. */
@@ -83,7 +85,7 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
     const dev = token ? db.deviceByToken(token) : null;
     if (!dev) return c.json({ error: "unauthorized" }, 401);
-    const { code, expiresAt } = db.createPairing(space.spaceId);
+    const { code, expiresAt } = db.createPairing(dev.spaceId);
     const hostHeader = (c.req.header("host") ?? `localhost:${cfg.port}`).split(":")[0];
     const hosts = phoneHosts();
     const base = uiOrigin(cfg, hosts[0] ?? hostHeader);
@@ -95,23 +97,24 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
 
   const authed = (header: string | undefined) => {
     const token = header?.replace(/^Bearer\s+/i, "");
-    const dev = token ? db.deviceByToken(token) : null;
-    return dev && dev.spaceId === space.spaceId ? dev : null;
+    return token ? db.deviceByToken(token) : null;
   };
 
   /** Connected-app catalog. The API key never leaves the host. */
   app.get("/api/composio/apps", async (c) => {
-    if (!authed(c.req.header("authorization"))) return c.json({ error: "unauthorized" }, 401);
-    return c.json(await composioStatus(space));
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    return c.json(await composioStatus(registry.get(dev.spaceId).space));
   });
 
   app.post("/api/composio/connect", async (c) => {
-    if (!authed(c.req.header("authorization"))) return c.json({ error: "unauthorized" }, 401);
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
     const body = (await c.req.json().catch(() => ({}))) as { toolkit?: string };
     const toolkit = String(body.toolkit ?? "").trim().toLowerCase();
     if (!/^[a-z0-9_-]{2,64}$/.test(toolkit)) return c.json({ error: "Enter an app slug such as gmail or github." }, 400);
     try {
-      const result = await composioConnect(space, toolkit);
+      const result = await composioConnect(registry.get(dev.spaceId).space, toolkit);
       if (!result.redirectUrl) return c.json({ error: "Composio did not return a connect link for that app." }, 502);
       return c.json(result);
     } catch (error) {
@@ -120,14 +123,13 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     }
   });
 
-  /** Bind the signed-in Google account to a space that this device already belongs to. */
+  /** Bind an existing device token to the signed-in Google account, or refuse a mismatch. */
   app.post("/api/account/claim", async (c) => {
-    const dev = authed(c.req.header("authorization"));
-    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
     const user = await googleUser(c.req.header("x-supabase-token"));
     if (!user) return c.json({ error: "Sign in with Google first" }, 401);
-    const conflict = db.claimAccount(dev.spaceId, user);
-    if (conflict) return c.json({ error: conflict }, 403);
+    const claimed = registry.claimDevice(user, token);
+    if (!claimed.ok) return c.json({ error: claimed.error }, claimed.status);
     return c.json({ email: user.email, name: user.name });
   });
 
@@ -140,12 +142,14 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     if (!user) return c.json({ error: "Sign in with Google first" }, 401);
     const spaceId = db.findPairing(code);
     if (!spaceId) return c.json({ error: "That code is invalid or has expired. Generate a new one on the desktop." }, 400);
-    const conflict = db.claimAccount(spaceId, user);
+    const denied = registry.pairingDenial(spaceId, user.id);
+    if (denied) return c.json({ error: denied }, 403);
+    const conflict = db.bindAccount(spaceId, user);
     if (conflict) return c.json({ error: conflict }, 403);
     if (!db.claimPairing(code)) return c.json({ error: "That code is invalid or has expired. Generate a new one on the desktop." }, 400);
     const token = randomBytes(32).toString("hex");
     const device = db.createDevice(spaceId, (body.deviceName ?? "Mobile").slice(0, 60), body.platform ?? "mobile", token);
-    space.deviceUpserted(device);
+    registry.get(spaceId).space.deviceUpserted(device);
     return c.json({ token, deviceId: device.id, spaceId });
   });
 

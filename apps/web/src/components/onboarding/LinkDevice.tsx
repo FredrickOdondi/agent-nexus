@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { saveTokenForUser } from "@/lib/account";
+import { useAuth } from "@/lib/auth";
 import { DEVICE_NAME_KEY, TOKEN_KEY, useStore } from "@/lib/store";
 import { supabaseAccessToken } from "@/lib/supabase";
 import { defaultDeviceName, detectPlatform, isElectron } from "@/lib/platform";
@@ -30,7 +32,13 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
   const [name, setName] = useState(() => localStorage.getItem(DEVICE_NAME_KEY) ?? defaultDeviceName());
   const [error, setError] = useState<string | null>(null);
   const signOut = useStore((s) => s.signOut);
+  const userId = useAuth().session?.user.id;
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
+
+  function remember(token: string) {
+    if (userId) saveTokenForUser(userId, token);
+    else localStorage.setItem(TOKEN_KEY, token);
+  }
 
   useEffect(() => {
     if (initialCode) {
@@ -52,7 +60,7 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
         const data = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
         if (res.ok && data.token) {
           if (cancelled) return;
-          localStorage.setItem(TOKEN_KEY, data.token);
+          remember(data.token);
           localStorage.setItem(DEVICE_NAME_KEY, name);
           setPhase("done");
           onLinked();
@@ -86,7 +94,7 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
       });
       const data = (await res.json()) as { token?: string; error?: string };
       if (!res.ok || !data.token) throw new Error(data.error ?? "Pairing failed");
-      localStorage.setItem(TOKEN_KEY, data.token);
+      remember(data.token);
       localStorage.setItem(DEVICE_NAME_KEY, name.trim() || defaultDeviceName());
       sessionStorage.setItem("nimbus.claimedCode", code);
       setPhase("done");

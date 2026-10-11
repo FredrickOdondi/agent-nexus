@@ -1,12 +1,9 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
 import { serve } from "@hono/node-server";
 import { ensureDirs, loadConfig } from "./config.js";
 import { Db } from "./db.js";
 import { createHttpApp, phoneHosts, uiOrigin } from "./http.js";
 import { Hub } from "./hub.js";
-import { RunManager } from "./runs.js";
-import { SpaceService } from "./space.js";
+import { SpaceRegistry } from "./registry.js";
 
 process.removeAllListeners("warning");
 process.on("warning", (w) => { if (w.name !== "ExperimentalWarning") console.warn(w); });
@@ -22,17 +19,9 @@ async function main() {
   await ensureDirs(cfg);
   const startedAt = Date.now();
   const db = new Db(cfg.dataDir);
-  const { spaceId } = db.ensurePrimarySpace(cfg.defaultWorkspace);
-  const tokenPath = path.join(cfg.dataDir, "primary-device.token");
-  const { token: primaryToken } = db.getOrCreatePrimaryDevice(spaceId, cfg.platformName, "desktop", {
-    read: () => { try { return readFileSync(tokenPath, "utf8").trim() || null; } catch { return null; } },
-    write: (t) => writeFileSync(tokenPath, t, { mode: 0o600 }),
-  });
-
-  const space = new SpaceService(db, spaceId, cfg.defaultWorkspace);
-  const runs = new RunManager(space, cfg.dataDir, cfg.platformName, log);
-  const hub = new Hub(db, space, runs, log);
-  const app = createHttpApp(cfg, db, space, primaryToken, startedAt);
+  const registry = new SpaceRegistry(db, cfg, log);
+  const hub = new Hub(db, registry, log);
+  const app = createHttpApp(cfg, db, registry, startedAt);
 
   const server = serve(
     {
