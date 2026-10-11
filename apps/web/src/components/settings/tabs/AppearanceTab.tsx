@@ -6,7 +6,7 @@ import { Section } from "../SettingsDialog";
 
 const OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun; hint: string }[] = [
   { value: "light", label: "Light", icon: Sun, hint: "Warm paper, indigo accent" },
-  { value: "dark", label: "Dark", icon: Moon, hint: "Graphite navy, luminous accent" },
+  { value: "dark", label: "Dark", icon: Moon, hint: "Neutral graphite, gray accent" },
   { value: "system", label: "System", icon: Monitor, hint: "Follow your OS setting" },
 ];
 
@@ -37,10 +37,10 @@ function Preview({ mode }: { mode: ThemePreference }) {
   const dark = mode === "dark";
   const system = mode === "system";
   return (
-    <div className={cn("relative h-24 overflow-hidden rounded-xl border", dark ? "bg-[oklch(0.16_0.012_265)]" : "bg-[oklch(0.985_0.003_85)]")}>
-      {system && <div className="absolute inset-y-0 right-0 w-1/2 bg-[oklch(0.16_0.012_265)]" />}
+    <div className={cn("relative h-24 overflow-hidden rounded-xl border", dark ? "bg-[oklch(0.16_0_0)]" : "bg-[oklch(0.985_0.003_85)]")}>
+      {system && <div className="absolute inset-y-0 right-0 w-1/2 bg-[oklch(0.16_0_0)]" />}
       <div className="absolute inset-y-0 left-0 w-1/3 border-r border-black/5 bg-black/[0.03] dark:border-white/5" />
-      <div className={cn("absolute top-3 right-3 h-5 w-24 rounded-full", dark || system ? "bg-[oklch(0.5_0.17_268)]" : "bg-[oklch(0.56_0.2_268)]")} />
+      <div className={cn("absolute top-3 right-3 h-5 w-24 rounded-full", dark || system ? "bg-[oklch(0.34_0_0)]" : "bg-[oklch(0.56_0.2_268)]")} />
       <div className={cn("absolute top-10 left-[38%] h-2 w-28 rounded-full", dark ? "bg-white/40" : "bg-black/20")} />
       <div className={cn("absolute top-14 left-[38%] h-2 w-20 rounded-full", dark ? "bg-white/25" : "bg-black/10")} />
       <div className={cn("absolute right-3 bottom-3 left-[38%] h-6 rounded-full border", dark ? "border-white/10 bg-white/5" : "border-black/10 bg-white")} />

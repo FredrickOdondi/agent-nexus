@@ -121,6 +121,11 @@ export default function App() {
   else if (accountGate === "error") screen = "error";
   else if (showLink) screen = "link";
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("workspace", screen === "app");
+    return () => document.documentElement.classList.remove("workspace");
+  }, [screen]);
+
   return (
     <TooltipProvider delay={300}>
       <AnimatePresence mode="wait" initial={false}>

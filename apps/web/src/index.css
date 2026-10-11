@@ -148,6 +148,40 @@
   --shadow-color: 265 30% 2%;
 }
 
+/* The workspace drops the navy cast. Sign-in keeps the indigo brand. */
+.dark.workspace {
+  --background: oklch(0.16 0 0);
+  --foreground: oklch(0.96 0 0);
+  --surface: oklch(0.19 0 0);
+  --surface-raised: oklch(0.225 0 0);
+  --card: oklch(0.21 0 0);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.225 0 0);
+  --popover-foreground: oklch(0.96 0 0);
+  --primary: oklch(0.86 0 0);
+  --primary-foreground: oklch(0.16 0 0);
+  --secondary: oklch(0.26 0 0);
+  --secondary-foreground: oklch(0.94 0 0);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.68 0 0);
+  --accent: oklch(0.3 0 0);
+  --accent-foreground: oklch(0.94 0 0);
+  --ring: oklch(0.86 0 0 / 45%);
+  --chart-1: oklch(0.86 0 0);
+  --chart-2: oklch(0.52 0 0);
+  --sidebar: oklch(0.13 0 0);
+  --sidebar-foreground: oklch(0.92 0 0);
+  --sidebar-primary: oklch(0.86 0 0);
+  --sidebar-primary-foreground: oklch(0.16 0 0);
+  --sidebar-accent: oklch(0.22 0 0);
+  --sidebar-accent-foreground: oklch(0.96 0 0);
+  --sidebar-ring: oklch(0.86 0 0 / 45%);
+  --bubble-user: oklch(0.34 0 0);
+  --bubble-user-foreground: oklch(0.97 0 0);
+  --code-bg: oklch(0.13 0 0);
+  --shadow-color: 0 0% 0%;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
