@@ -45,7 +45,7 @@ On Linux in a container, add Electron's `--no-sandbox` flag if the process canno
 
 `localhost` on your phone is the phone itself, so it can never open the app running on your computer. Vercel can host a static site, but this chat server keeps a live WebSocket, a SQLite file, and runs commands on your machine, so it has to stay on the computer.
 
-Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Devices** and scan the QR code. Prefer the address ending in `.local` (for example `http://your-mac.local:47830`). A raw `192.168` address also works, but a home-screen icon saved from it opens inside the browser. macOS may ask to allow incoming connections for Node the first time.
+Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Devices** and generate a QR code. The code opens this computer’s Wi‑Fi address, such as `http://192.168.1.20:47830`, so the phone stays on that network. It does not use `localhost` or the `.local` name. A `.local` address is still listed for Add to Home Screen. macOS may ask to allow incoming connections for Node the first time.
 
 ## Sign in
 
@@ -63,7 +63,7 @@ The Google Cloud client’s redirect URI stays `https://<project-ref>.supabase.c
 ## Link a phone
 
 1. On the desktop, sign in with Google, then open **Settings → Devices** and choose **Generate**.
-2. On the phone (same Wi-Fi), open the address, sign in with the same Google account, and scan the QR code or type the 6-digit code.
+2. On the phone (same Wi-Fi), scan that QR code and sign in with the same Google account. The page that opens is the computer’s Wi‑Fi address. You can also type the 6-digit code if the phone is already on that address.
 3. Chats, settings, and agent runs sync both ways. Each device has its own token; revoking a device in Settings disconnects it.
 
 On a phone, Nimbus opens to the chat list. Tap a chat to open it full screen; Chats, or the system back button, returns to the list. Add the page to your home screen for an icon with no browser bar. The UI is the same code as the desktop — there is no separate mobile codebase.

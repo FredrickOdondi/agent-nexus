@@ -45,7 +45,7 @@ export function DevicesTab() {
 
   return (
     <div>
-      <Section title="Link a phone or another computer" description="Use the address ending in .local for the home screen icon. A shortcut saved from a 192.168 address always opens inside the browser.">
+      <Section title="Link a phone or another computer" description="The QR code opens this computer’s Wi‑Fi address, so the phone stays on the same network. Generate a new code after you join Wi‑Fi. A .local name is only for a home-screen icon.">
         <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
           <div className="flex size-56 items-center justify-center rounded-2xl border bg-white p-3 elevation-1 dark:bg-white">
             <AnimatePresence mode="wait">
@@ -60,8 +60,11 @@ export function DevicesTab() {
           </div>
           <div className="flex flex-col gap-3">
             <div>
-              <p className="text-sm font-medium">1. Open Nimbus on the other device</p>
-              <p className="text-xs text-muted-foreground">On an iPhone, open {ticket?.lanUrls[0] ? <span className="font-mono break-all">{ticket.lanUrls[0].replace(/\/$/, "")}</span> : "the .local address"} in Safari, then Share → Add to Home Screen. Delete any older shortcut that uses a 192.168 address.{ticket && ticket.lanUrls.length > 1 ? <> If the name does not load, use <span className="font-mono break-all">{ticket.lanUrls[ticket.lanUrls.length - 1]}</span>.</> : null}</p>
+              <p className="text-sm font-medium">1. Scan with the phone on this Wi‑Fi</p>
+              <p className="text-xs text-muted-foreground">
+                {ticket ? <>The code opens <span className="font-mono break-all">{ticket.url.replace(/\/#.*$/, "")}</span>. That is this computer on the same Wi‑Fi, with the pairing code filled in.</> : "Generate a code, then point the phone’s camera at it. The phone opens this computer’s Wi‑Fi address."}
+                {ticket && ticket.lanUrls.some((u) => u.includes(".local")) ? <> For a full-screen icon later, open <span className="font-mono break-all">{ticket.lanUrls.find((u) => u.includes(".local"))?.replace(/\/$/, "")}</span> in Safari and use Share → Add to Home Screen.</> : null}
+              </p>
             </div>
             <div>
               <p className="text-sm font-medium">2. Enter the 6-digit code</p>

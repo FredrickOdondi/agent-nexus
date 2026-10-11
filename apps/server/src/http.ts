@@ -1,5 +1,6 @@
+import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { promises as fs, existsSync } from "node:fs";
+import { promises as fs, existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Hono } from "hono";
@@ -18,25 +19,84 @@ export function uiOrigin(cfg: ServerConfig, host: string): string {
   return `http://${host}:${port}`;
 }
 
+const VIRTUAL_IFACE = /^(docker|br-|veth|virbr|vmnet|vboxnet|utun|awdl|llw|bridge|zt|tailscale|cni|flannel|cali|wg|tun|tap|lo)/i;
+
+/** Private IPv4 a phone on the same Wi-Fi can open. Skips localhost and link-local. */
+export function isLanIPv4(ip: string): boolean {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return false;
+  const nums = parts.map((part) => Number(part));
+  if (nums.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const [a, b] = nums;
+  if (a === 10) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  return false;
+}
+
+function lanRank(ip: string): number {
+  if (ip.startsWith("192.168.")) return 0;
+  if (ip.startsWith("10.")) return 1;
+  return 2;
+}
+
+/** Wi-Fi and Ethernet addresses, with home-network ranges ahead of bridge networks. */
+export function lanAddresses(): string[] {
+  const found: { address: string; rank: number }[] = [];
+  for (const [iface, addrs] of Object.entries(os.networkInterfaces())) {
+    if (VIRTUAL_IFACE.test(iface)) continue;
+    for (const a of addrs ?? []) {
+      if (a.family === "IPv4" && !a.internal && isLanIPv4(a.address)) found.push({ address: a.address, rank: lanRank(a.address) });
+    }
+  }
+  found.sort((a, b) => a.rank - b.rank);
+  return [...new Set(found.map((item) => item.address))];
+}
+
+/** The address this computer uses to reach the network, when that address is on the LAN. */
+function defaultRouteAddress(): string | null {
+  try {
+    if (process.platform === "linux") {
+      const text = readFileSync("/proc/net/route", "utf8");
+      for (const line of text.trim().split("\n").slice(1)) {
+        const [iface, dest] = line.trim().split(/\s+/);
+        if (dest !== "00000000" || !iface || VIRTUAL_IFACE.test(iface)) continue;
+        const addr = (os.networkInterfaces()[iface] ?? []).find((a) => a.family === "IPv4" && isLanIPv4(a.address));
+        if (addr) return addr.address;
+      }
+      return null;
+    }
+    if (process.platform === "darwin") {
+      const info = execFileSync("/sbin/route", ["-n", "get", "default"], { encoding: "utf8", timeout: 1500 });
+      const iface = /^interface:\s*(\S+)/m.exec(info)?.[1];
+      if (!iface || VIRTUAL_IFACE.test(iface)) return null;
+      const addr = execFileSync("/usr/sbin/ipconfig", ["getifaddr", iface], { encoding: "utf8", timeout: 1500 }).trim();
+      return isLanIPv4(addr) ? addr : null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /**
- * Hosts a phone can open. A `.local` name is listed first because a home-screen
- * icon saved from a raw IP address opens inside the browser, while the same
- * icon saved from a hostname can open full screen.
+ * Addresses a phone can open. The Wi-Fi address is first because that is what a
+ * scanned QR code must open. A `.local` name is last: it is useful for a home-screen
+ * icon, and it is a different site from the Wi-Fi address.
  */
 export function phoneHosts(): string[] {
-  const hosts: string[] = [];
+  const ips = lanAddresses();
+  const preferred = defaultRouteAddress();
+  const ordered = preferred ? [preferred, ...ips.filter((ip) => ip !== preferred)] : ips;
+  const hosts = [...ordered];
   const short = os.hostname().trim().replace(/\.local$/i, "");
   if (/^[A-Za-z0-9-]+$/.test(short)) hosts.push(`${short}.local`);
-  for (const ip of lanAddresses()) if (!hosts.includes(ip)) hosts.push(ip);
   return hosts;
 }
 
-export function lanAddresses(): string[] {
-  const out: string[] = [];
-  for (const [, addrs] of Object.entries(os.networkInterfaces())) {
-    for (const a of addrs ?? []) if (a.family === "IPv4" && !a.internal) out.push(a.address);
-  }
-  return out;
+/** Address encoded in the pairing QR. Never localhost and never the `.local` name. */
+export function wifiHost(): string | null {
+  return phoneHosts().find((host) => isLanIPv4(host)) ?? null;
 }
 
 const MIME: Record<string, string> = {
@@ -85,11 +145,11 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
     const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
     const dev = token ? db.deviceByToken(token) : null;
     if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const wifi = wifiHost();
+    if (!wifi) return c.json({ error: "This computer has no Wi‑Fi address. Join the same network as the phone, then generate a new code." }, 409);
     const { code, expiresAt } = db.createPairing(dev.spaceId);
-    const hostHeader = (c.req.header("host") ?? `localhost:${cfg.port}`).split(":")[0];
     const hosts = phoneHosts();
-    const base = uiOrigin(cfg, hosts[0] ?? hostHeader);
-    const url = `${base}/#/pair/${code}`;
+    const url = `${uiOrigin(cfg, wifi)}/#/pair/${code}`;
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#0b0b0f", light: "#ffffff" } });
     const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: hosts.map((host) => uiOrigin(cfg, host)) };
     return c.json(ticket);
