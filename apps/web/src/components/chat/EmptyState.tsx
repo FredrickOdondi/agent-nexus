@@ -19,11 +19,12 @@ export function EmptyState() {
   const demo = settings?.provider.kind === "mock" || (settings && !settings.provider.hasApiKey);
 
   return (
-    <div className="relative mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-start px-4 py-6 sm:justify-center sm:px-6 sm:py-10">
+    <div className="relative flex h-full w-full flex-col items-center justify-start px-4 pt-8 pb-6 sm:px-6 sm:pt-16 sm:pb-8">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(ellipse_at_50%_-10%,var(--primary),transparent_58%)] opacity-[0.14]" />
-        <div className="absolute inset-x-[8%] top-8 h-72 bg-[radial-gradient(ellipse_at_72%_0%,var(--chart-2),transparent_62%)] opacity-[0.18]" />
+        <div className="absolute -top-40 left-1/2 h-[36rem] w-[80rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute -top-10 left-[62%] h-80 w-[40rem] -translate-x-1/2 rounded-full bg-chart-2/15 blur-3xl" />
       </div>
+      <div className="relative flex w-full max-w-3xl flex-col items-center">
 
       <motion.div initial={{ opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} className="mb-6">
         <NimbusMark size={72} />
@@ -69,6 +70,7 @@ export function EmptyState() {
           </motion.button>
         ))}
       </motion.div>
+      </div>
     </div>
   );
 }
