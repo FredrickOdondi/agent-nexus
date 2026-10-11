@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, Cpu, Info, Palette, Plug, Smartphone } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, Cpu, Info, Palette, Plug, Smartphone } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -19,45 +19,108 @@ const TABS = [
   { id: "about", label: "About", icon: Info },
 ];
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener("change", handler);
+    setMatches(mq.matches);
+    return () => mq.removeEventListener("change", handler);
+  }, [query]);
+  return matches;
+}
+
+function SettingsPanel({ tab }: { tab: string }) {
+  return (
+    <>
+      {tab === "model" && <ModelTab />}
+      {tab === "agent" && <AgentTab />}
+      {tab === "apps" && <AppsTab />}
+      {tab === "devices" && <DevicesTab />}
+      {tab === "appearance" && <AppearanceTab />}
+      {tab === "about" && <AboutTab />}
+    </>
+  );
+}
+
 export function SettingsDialog() {
   const open = useStore((s) => s.settingsOpen);
   const tab = useStore((s) => s.settingsTab);
+  const atRoot = useStore((s) => s.settingsAtRoot);
   const close = useStore((s) => s.closeSettings);
   const openSettings = useStore((s) => s.openSettings);
-  const [mobileList, setMobileList] = useState(true);
-  useEffect(() => { if (open) setMobileList(true); }, [open]);
+  const showRoot = useStore((s) => s.showSettingsRoot);
+  const phone = useMediaQuery("(max-width: 1023px)");
+  const current = TABS.find((t) => t.id === tab);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="flex h-[min(680px,92dvh)] w-[min(880px,96vw)] max-w-[96vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-none sm:flex-row" showCloseButton>
+      <DialogContent
+        fullscreen={phone}
+        showCloseButton={!phone || atRoot}
+        className={phone ? "bg-background" : "flex h-[min(680px,92dvh)] w-[min(880px,96vw)] max-w-[96vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-none sm:flex-row"}
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
           <DialogDescription>Configure your model, connected apps, agent tools, linked devices and appearance.</DialogDescription>
         </DialogHeader>
-        <nav className={cn("shrink-0 border-b bg-sidebar p-2 sm:w-52 sm:border-r sm:border-b-0 sm:p-3", !mobileList && "hidden sm:block")} aria-label="Settings sections">
-          <p className="hidden px-2 pt-1 pb-2 text-sm font-semibold sm:block">Settings</p>
-          <ul className="flex gap-1 overflow-x-auto hide-scrollbar sm:flex-col">
-            {TABS.map((t) => (
-              <li key={t.id} className="shrink-0">
-                <button
-                  type="button"
-                  onClick={() => { openSettings(t.id); setMobileList(false); }}
-                  className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm whitespace-nowrap transition-colors", tab === t.id ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground")}
-                >
-                  <t.icon className="size-4" />{t.label}
+        {phone ? (
+          atRoot ? (
+            <div className="flex h-full min-h-0 flex-col">
+              <header className="px-5 pt-[max(1.25rem,env(safe-area-inset-top))] pr-16 pb-2">
+                <h2 className="text-[32px] leading-none font-semibold tracking-tight">Settings</h2>
+              </header>
+              <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[max(1rem,env(safe-area-inset-bottom))]" aria-label="Settings sections">
+                {TABS.map((t) => (
+                  <li key={t.id}>
+                    <button type="button" onClick={() => openSettings(t.id)} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left active:bg-muted">
+                      <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-foreground"><t.icon className="size-5" /></span>
+                      <span className="text-[17px] font-medium">{t.label}</span>
+                      <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="flex h-full min-h-0 flex-col">
+              <header className="relative flex items-center border-b pt-[env(safe-area-inset-top)]">
+                <button type="button" onClick={showRoot} className="flex h-12 items-center gap-0.5 px-1 text-[17px] text-primary active:opacity-60">
+                  <ChevronLeft className="size-6" />
+                  Settings
                 </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          {tab === "model" && <ModelTab />}
-          {tab === "agent" && <AgentTab />}
-          {tab === "apps" && <AppsTab />}
-          {tab === "devices" && <DevicesTab />}
-          {tab === "appearance" && <AppearanceTab />}
-          {tab === "about" && <AboutTab />}
-        </div>
+                <p className="pointer-events-none absolute inset-x-24 truncate text-center text-[17px] font-semibold">{current?.label}</p>
+                <button type="button" onClick={close} className="ml-auto flex h-12 items-center px-4 text-[17px] text-primary active:opacity-60">Done</button>
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+                <SettingsPanel tab={tab} />
+              </div>
+            </div>
+          )
+        ) : (
+          <>
+            <nav className="shrink-0 border-b bg-sidebar p-2 sm:w-52 sm:border-r sm:border-b-0 sm:p-3" aria-label="Settings sections">
+              <p className="hidden px-2 pt-1 pb-2 text-sm font-semibold sm:block">Settings</p>
+              <ul className="flex gap-1 overflow-x-auto hide-scrollbar sm:flex-col">
+                {TABS.map((t) => (
+                  <li key={t.id} className="shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openSettings(t.id)}
+                      className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm whitespace-nowrap transition-colors", tab === t.id ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground")}
+                    >
+                      <t.icon className="size-4" />{t.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+              <SettingsPanel tab={tab} />
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

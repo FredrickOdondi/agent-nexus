@@ -287,6 +287,33 @@
     0 24px 60px -16px hsl(var(--shadow-color) / 0.28);
 }
 
+@media (max-width: 1023px) {
+  html,
+  body,
+  #root {
+    overflow: hidden;
+    height: 100%;
+  }
+  body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    touch-action: manipulation;
+  }
+  .mobile-app {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: var(--app-height, 100dvh);
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 @utility safe-top {
   padding-top: env(safe-area-inset-top);
 }

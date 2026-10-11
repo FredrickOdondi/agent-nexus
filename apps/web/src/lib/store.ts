@@ -27,6 +27,8 @@ interface UiState {
   sidebarOpen: boolean;
   settingsOpen: boolean;
   settingsTab: string;
+  /** Phone settings opens on a section list unless a specific tab was requested. */
+  settingsAtRoot: boolean;
   selectedId: string | null;
   draftMode: Conversation["mode"];
 }
@@ -55,6 +57,7 @@ interface State extends UiState {
   newChat(): void;
   setSidebar(open: boolean): void;
   openSettings(tab?: string): void;
+  showSettingsRoot(): void;
   closeSettings(): void;
   setDraftMode(mode: Conversation["mode"]): void;
   signOut(): Promise<void>;
@@ -78,6 +81,7 @@ export const useStore = create<State>((set, get) => ({
   sidebarOpen: window.innerWidth >= 1024,
   settingsOpen: false,
   settingsTab: "model",
+  settingsAtRoot: true,
   selectedId: null,
   draftMode: "agent",
   connection: "connecting",
@@ -103,8 +107,9 @@ export const useStore = create<State>((set, get) => ({
       cache.conversations.toArray().catch(() => [] as Conversation[]),
       getMeta<string>("selectedId"),
     ]);
-    set({ seq: seq ?? 0, conversations: sortConversations(cachedConvs), selectedId: selected ?? null, bootstrapped: true });
-    if (selected) void get().ensureMessages(selected);
+    const phone = window.matchMedia("(max-width: 1023px)").matches;
+    set({ seq: seq ?? 0, conversations: sortConversations(cachedConvs), selectedId: phone ? null : (selected ?? null), bootstrapped: true });
+    if (!phone && selected) void get().ensureMessages(selected);
 
     client?.close();
     client = new SyncClient({
@@ -180,7 +185,8 @@ export const useStore = create<State>((set, get) => ({
   },
 
   setSidebar: (open) => set({ sidebarOpen: open }),
-  openSettings: (tab) => set({ settingsOpen: true, settingsTab: tab ?? get().settingsTab }),
+  openSettings: (tab) => set({ settingsOpen: true, settingsTab: tab ?? "model", settingsAtRoot: tab == null }),
+  showSettingsRoot: () => set({ settingsAtRoot: true }),
   closeSettings: () => set({ settingsOpen: false }),
   setDraftMode: (mode) => set({ draftMode: mode }),
 

@@ -53,7 +53,7 @@ Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Device
 2. On the phone (same Wi-Fi), scan the QR code or open the LAN address and type the 6-digit code.
 3. Chats, settings, and agent runs sync both ways. Each device has its own token; revoking a device in Settings disconnects it.
 
-Add the page to your home screen for an app-style window. The UI is the same code as the desktop — there is no separate mobile codebase.
+On a phone, Nimbus opens to the chat list. Tap a chat to open it full screen; Chats, or the system back button, returns to the list. Add the page to your home screen for an icon with no browser bar. The UI is the same code as the desktop — there is no separate mobile codebase.
 
 ## Models
 

@@ -118,7 +118,7 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
       </div>
       <div className="absolute top-3 right-3 safe-top"><ThemeToggle /></div>
 
-      <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 240, damping: 26 }} className="w-full max-w-md rounded-3xl border bg-card/80 p-6 text-card-foreground glass elevation-3 sm:p-8">
+      <motion.div initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 240, damping: 26 }} className="w-full max-w-md p-1 text-card-foreground sm:rounded-3xl sm:border sm:bg-card/80 sm:p-8 sm:glass sm:elevation-3">
         <div className="mb-6 flex items-center gap-3">
           <div className="flex size-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-chart-2 text-lg font-bold text-primary-foreground elevation-2">N</div>
           <div>
@@ -180,7 +180,7 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
                 <Input id="device-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Pixel 9" maxLength={60} />
               </div>
 
-              <Button className="w-full" size="lg" disabled={phase === "claiming" || !/^\d{6}$/.test(digits.join(""))} onClick={() => claim(digits.join(""))}>
+              <Button className="h-12 w-full text-base" size="lg" disabled={phase === "claiming" || !/^\d{6}$/.test(digits.join(""))} onClick={() => claim(digits.join(""))}>
                 {phase === "claiming" ? <Loader2 className="animate-spin" /> : <ArrowRight />}
                 {phase === "claiming" ? "Linking…" : "Link device"}
               </Button>

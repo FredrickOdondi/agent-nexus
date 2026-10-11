@@ -58,7 +58,7 @@ export function QuestionCard({ part, conversationId, messageId, live }: { part: 
               disabled={answered || !live || busy}
               onClick={() => answer(o.label)}
               className={cn(
-                "group flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-all",
+                "group flex min-h-12 items-start gap-2.5 rounded-xl border px-3 py-3 text-left transition-all sm:py-2.5",
                 !answered && live && "hover:border-primary/60 hover:bg-primary/5 active:scale-[0.99]",
                 chosen && "border-primary bg-primary/10",
                 answered && !chosen && "opacity-50",

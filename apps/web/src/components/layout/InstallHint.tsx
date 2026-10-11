@@ -24,21 +24,19 @@ export function InstallHint() {
   };
 
   return (
-    <div className="flex items-start gap-2 border-b bg-muted/70 px-3 py-2 text-xs text-muted-foreground">
-      <div className="min-w-0 flex-1 space-y-2 leading-relaxed">
-        <p>
-          {ios
-            ? ipShortcut
-              ? "This 192.168 shortcut opens inside Safari. Delete it. On your computer, Settings → Devices shows an address ending in .local. Open that in Safari, then Share → Add to Home Screen."
-              : "Tap Share, then Add to Home Screen, and open Nimbus from the new icon. That icon has no Safari bar."
-            : "Chrome keeps its address bar on a Wi-Fi shortcut. Hide it for this visit, or add the .local address from your computer’s Settings → Devices."}
-        </p>
-        {!ios && (
-          <Button type="button" size="sm" variant="secondary" onClick={() => void hideBar()}>
-            Hide browser bar
-          </Button>
-        )}
-      </div>
+    <div className="mx-4 mb-2 flex items-start gap-2 rounded-2xl bg-muted px-3 py-2.5 text-[13px] leading-snug text-muted-foreground">
+      <p className="min-w-0 flex-1">
+        {ios
+          ? ipShortcut
+            ? "This address opens inside Safari. Use the .local link from Settings → Devices, then Share → Add to Home Screen."
+            : "Share → Add to Home Screen, then open Nimbus from the icon. That opens full screen."
+          : "The Wi-Fi shortcut keeps Chrome’s bar. Hide it, or add the .local address from Settings → Devices."}
+      </p>
+      {!ios && (
+        <Button type="button" size="sm" variant="secondary" className="h-8 shrink-0" onClick={() => void hideBar()}>
+          Hide bar
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"

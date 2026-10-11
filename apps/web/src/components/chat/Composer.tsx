@@ -101,7 +101,7 @@ export function Composer() {
   const current = MODES.find((m) => m.value === mode)!;
 
   return (
-    <div className="relative mx-auto w-full max-w-3xl px-3 pb-3 sm:px-6 sm:pb-5">
+    <div className="relative mx-auto w-full max-w-3xl px-2 pb-2 sm:px-6 sm:pb-5">
       <AnimatePresence>
         {showSlash && (
           <motion.ul initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }} transition={{ duration: 0.15 }} className="absolute right-3 bottom-full left-3 z-10 mb-2 overflow-hidden rounded-xl border bg-popover p-1 elevation-3 sm:right-6 sm:left-6">
@@ -125,8 +125,10 @@ export function Composer() {
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
           rows={1}
-          placeholder={running ? "Nimbus is working… you can stop it or wait" : mode === "plan" ? "Describe what to plan…" : mode === "chat" ? "Ask anything…" : "Ask Nimbus to build, fix, research…"}
-          className="max-h-[220px] w-full resize-none bg-transparent px-3 pt-2 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/70"
+          placeholder={running ? "Nimbus is working…" : mode === "plan" ? "Describe what to plan…" : mode === "chat" ? "Ask anything…" : "Ask Nimbus to build, fix, research…"}
+          enterKeyHint="send"
+          autoCapitalize="sentences"
+          className="max-h-[220px] w-full resize-none bg-transparent px-3 pt-2 pb-1 text-base leading-relaxed outline-none placeholder:text-muted-foreground/70 lg:text-[15px]"
           disabled={offline && !value}
           aria-label="Message"
         />
@@ -151,11 +153,11 @@ export function Composer() {
             <AnimatePresence mode="wait" initial={false}>
               {running ? (
                 <motion.div key="stop" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
-                  <Button onClick={stop} size="icon" className="rounded-full" variant="secondary" aria-label="Stop"><Square className="size-3.5 fill-current" /></Button>
+                  <Button onClick={stop} size="icon" className="rounded-full max-lg:size-11" variant="secondary" aria-label="Stop"><Square className="size-3.5 fill-current" /></Button>
                 </motion.div>
               ) : (
                 <motion.div key="send" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
-                  <Button onClick={() => void submit()} size="icon" className="rounded-full" disabled={!value.trim() || busy || offline} aria-label="Send"><ArrowUp /></Button>
+                  <Button onClick={() => void submit()} size="icon" className="rounded-full max-lg:size-11" disabled={!value.trim() || busy || offline} aria-label="Send"><ArrowUp /></Button>
                 </motion.div>
               )}
             </AnimatePresence>

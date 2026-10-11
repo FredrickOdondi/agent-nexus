@@ -51,10 +51,10 @@ export function ApprovalCard({ request }: { request: ApprovalRequest }) {
           <pre className="mt-2 max-h-40 overflow-auto rounded-lg bg-[var(--code-bg)] px-3 py-2 font-mono text-xs whitespace-pre-wrap">{request.summary || argsPreview}</pre>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t px-4 py-2.5">
-        <Button onClick={() => decide("allow")} disabled={busy !== null} size="sm"><ShieldCheck /> Allow once</Button>
-        <Button onClick={() => decide("allow_always")} disabled={busy !== null} size="sm" variant="secondary">Allow for this chat</Button>
-        <Button onClick={() => decide("deny")} disabled={busy !== null} size="sm" variant="ghost" className="ml-auto text-destructive hover:text-destructive"><ShieldX /> Deny</Button>
+      <div className="flex flex-col gap-2 border-t px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:px-4 sm:py-2.5">
+        <Button onClick={() => decide("allow")} disabled={busy !== null} size="sm" className="max-lg:h-11"><ShieldCheck /> Allow once</Button>
+        <Button onClick={() => decide("allow_always")} disabled={busy !== null} size="sm" variant="secondary" className="max-lg:h-11">Allow for this chat</Button>
+        <Button onClick={() => decide("deny")} disabled={busy !== null} size="sm" variant="ghost" className="text-destructive hover:text-destructive sm:ml-auto max-lg:h-11"><ShieldX /> Deny</Button>
       </div>
     </motion.div>
   );

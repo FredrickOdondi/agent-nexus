@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Header } from "@/components/layout/Header";
-import { InstallHint } from "@/components/layout/InstallHint";
+import { MobileShell } from "@/components/layout/MobileShell";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
@@ -97,33 +96,29 @@ function Shell() {
     return () => window.removeEventListener("keydown", onKey);
   }, [setSidebar]);
 
+  if (!isDesktopLayout) {
+    return (
+      <>
+        <MobileShell />
+        <SettingsDialog />
+      </>
+    );
+  }
+
   return (
     <div className={cn("flex h-dvh w-full overflow-hidden bg-background text-foreground", isElectron && "rounded-none", isStandalonePwa && "safe-top")}>
-      {isDesktopLayout ? (
-        <motion.div
-          initial={false}
-          animate={{ width: sidebarOpen ? 288 : 0, opacity: sidebarOpen ? 1 : 0 }}
-          transition={{ type: "spring", stiffness: 320, damping: 34 }}
-          className="relative h-full shrink-0 overflow-hidden border-r border-sidebar-border"
-          aria-hidden={!sidebarOpen}
-        >
-          <div className="h-full w-72"><Sidebar /></div>
-        </motion.div>
-      ) : (
-        <Sheet open={sidebarOpen} onOpenChange={setSidebar}>
-          <SheetContent side="left" showCloseButton={false} className="w-[86vw] max-w-sm gap-0 p-0 sm:max-w-sm">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Conversations</SheetTitle>
-              <SheetDescription>Browse your chats and settings</SheetDescription>
-            </SheetHeader>
-            <Sidebar onNavigate={() => setSidebar(false)} />
-          </SheetContent>
-        </Sheet>
-      )}
+      <motion.div
+        initial={false}
+        animate={{ width: sidebarOpen ? 288 : 0, opacity: sidebarOpen ? 1 : 0 }}
+        transition={{ type: "spring", stiffness: 320, damping: 34 }}
+        className="relative h-full shrink-0 overflow-hidden border-r border-sidebar-border"
+        aria-hidden={!sidebarOpen}
+      >
+        <div className="h-full w-72"><Sidebar /></div>
+      </motion.div>
 
       <main className="relative flex min-w-0 flex-1 flex-col">
-        <Header mobile={!isDesktopLayout} />
-        {!isDesktopLayout && <InstallHint />}
+        <Header mobile={false} />
         <Thread />
       </main>
       <SettingsDialog />

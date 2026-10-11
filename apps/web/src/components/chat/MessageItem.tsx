@@ -25,7 +25,7 @@ function UserMessage({ message, deviceName }: { message: Message; deviceName?: s
   return (
     <motion.div initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={spring} className="group flex justify-end py-2">
       <div className="max-w-[85%] sm:max-w-[72%]">
-        <div className="rounded-3xl rounded-br-lg bg-bubble-user px-4 py-2.5 text-[15px] leading-relaxed text-bubble-user-foreground elevation-1 whitespace-pre-wrap">{text}</div>
+        <div className="rounded-3xl rounded-br-lg bg-bubble-user px-4 py-2.5 text-base leading-relaxed text-bubble-user-foreground elevation-1 whitespace-pre-wrap lg:text-[15px]">{text}</div>
         <div className="mt-1 flex items-center justify-end gap-2 pr-1 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
           {deviceName && <span>from {deviceName}</span>}
           <span>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -66,7 +66,7 @@ function AssistantMessage({ message, isLast, approvals }: { message: Message; is
         </AnimatePresence>
         {message.status === "cancelled" && <p className="mt-1 text-xs text-muted-foreground italic">Stopped.</p>}
         {!streaming && (
-          <div className="mt-1 flex items-center gap-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+          <div className={cn("mt-1 flex items-center gap-0.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100", isLast && "[@media(hover:none)]:opacity-100")}>
             <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={copy} aria-label="Copy" />}>{copied ? <Check className="text-success" /> : <Copy />}</TooltipTrigger><TooltipContent>Copy</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={regenerate} aria-label="Regenerate" />}><RefreshCw /></TooltipTrigger><TooltipContent>Regenerate</TooltipContent></Tooltip>
             <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={rewind} aria-label="Rewind to here" />}><History /></TooltipTrigger><TooltipContent>Rewind: remove this and everything after</TooltipContent></Tooltip>
