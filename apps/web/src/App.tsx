@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Header } from "@/components/layout/Header";
+import { InstallHint } from "@/components/layout/InstallHint";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
@@ -122,6 +123,7 @@ function Shell() {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         <Header mobile={!isDesktopLayout} />
+        {!isDesktopLayout && <InstallHint />}
         <Thread />
       </main>
       <SettingsDialog />
