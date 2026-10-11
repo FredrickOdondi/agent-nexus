@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
 import { deflateSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { INPUT_SWIFT, SCREEN_PS1 } from "../../../packages/agent-core/dist/tools/screen.js";
+import { INPUT_C, SCREEN_PS1 } from "../../../packages/agent-core/dist/tools/screen.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -13,26 +13,20 @@ mkdirSync(screenDir, { recursive: true });
 mkdirSync(buildDir, { recursive: true });
 
 writeFileSync(path.join(screenDir, "nimbus-screen.ps1"), SCREEN_PS1);
-writeFileSync(path.join(screenDir, "nimbus-input.swift"), INPUT_SWIFT);
+writeFileSync(path.join(screenDir, "nimbus-input.c"), INPUT_C);
 writeFileSync(path.join(buildDir, "icon.png"), appIcon(1024));
 
 if (process.platform === "darwin") {
-  const swift = path.join(screenDir, "nimbus-input.swift");
+  const source = path.join(screenDir, "nimbus-input.c");
   const out = path.join(screenDir, "nimbus-input");
-  const arm = `${out}-arm64`;
-  const intel = `${out}-x64`;
-  const armOk = spawnSync("swiftc", ["-O", "-target", "arm64-apple-macosx13.0", "-o", arm, swift], { stdio: "inherit" }).status === 0;
-  const intelOk = spawnSync("swiftc", ["-O", "-target", "x86_64-apple-macosx13.0", "-o", intel, swift], { stdio: "inherit" }).status === 0;
-  if (armOk && intelOk) {
-    const lipo = spawnSync("lipo", ["-create", "-output", out, arm, intel], { stdio: "inherit" });
-    if (lipo.status !== 0) process.exit(lipo.status ?? 1);
-  } else if (armOk) {
-    spawnSync("mv", [arm, out], { stdio: "inherit" });
-  } else if (intelOk) {
-    spawnSync("mv", [intel, out], { stdio: "inherit" });
-  } else {
-    console.error("swiftc could not build the screen helper. Install Xcode command line tools.");
-    process.exit(1);
+  const flags = ["-O2", "-framework", "CoreGraphics", "-framework", "CoreFoundation", "-o", out, source];
+  const universal = spawnSync("clang", ["-arch", "arm64", "-arch", "x86_64", ...flags], { stdio: "inherit" });
+  if (universal.status !== 0) {
+    const native = spawnSync("clang", flags, { stdio: "inherit" });
+    if (native.status !== 0) {
+      console.error("clang could not build the screen helper. Install Xcode command line tools, then run pnpm desktop:dist again.");
+      process.exit(native.status ?? 1);
+    }
   }
   chmodSync(out, 0o755);
   console.log(`screen helper ${out}`);

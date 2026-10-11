@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { INPUT_SWIFT, SCREEN_PS1 } from "./screen.js";
+import { INPUT_C, SCREEN_PS1 } from "./screen.js";
 import {
   escapeSendKeysText,
   imageSize,
@@ -15,7 +15,7 @@ import {
 
 test("installer helpers contain the screen commands", () => {
   assert.match(SCREEN_PS1, /ValidateSet\("shot","click"/);
-  assert.match(INPUT_SWIFT, /case "click"/);
+  assert.match(INPUT_C, /strcmp\(cmd, "click"\)/);
 });
 
 test("png size is read from the IHDR chunk", () => {

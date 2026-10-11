@@ -345,62 +345,88 @@ async function shotWindows(dataDir: string): Promise<Shot> {
   }
 }
 
-export const INPUT_SWIFT = String.raw`
-import Foundation
-import CoreGraphics
+/** C, not Swift: Command Line Tools often ship a Swift compiler that rejects the Mac SDK. */
+export const INPUT_C = String.raw`
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-func num(_ i: Int) -> CGFloat { CGFloat(Double(CommandLine.arguments[i]) ?? 0) }
-func button(_ name: String) -> CGMouseButton {
-  if name == "right" { return .right }
-  if name == "middle" || name == "center" { return .center }
-  return .left
+static double num(int i, int argc, char **argv) {
+  return i < argc ? atof(argv[i]) : 0;
 }
-func down(_ b: CGMouseButton) -> CGEventType {
-  if b == .right { return .rightMouseDown }
-  if b == .center { return .otherMouseDown }
-  return .leftMouseDown
+
+static CGMouseButton button_of(const char *name) {
+  if (name && strcmp(name, "right") == 0) return kCGMouseButtonRight;
+  if (name && (strcmp(name, "middle") == 0 || strcmp(name, "center") == 0)) return kCGMouseButtonCenter;
+  return kCGMouseButtonLeft;
 }
-func up(_ b: CGMouseButton) -> CGEventType {
-  if b == .right { return .rightMouseUp }
-  if b == .center { return .otherMouseUp }
-  return .leftMouseUp
+
+static CGEventType down_type(CGMouseButton b) {
+  if (b == kCGMouseButtonRight) return kCGEventRightMouseDown;
+  if (b == kCGMouseButtonCenter) return kCGEventOtherMouseDown;
+  return kCGEventLeftMouseDown;
 }
-func post(_ type: CGEventType, _ p: CGPoint, _ b: CGMouseButton) {
-  CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: p, mouseButton: b)?.post(tap: .cghidEventTap)
+
+static CGEventType up_type(CGMouseButton b) {
+  if (b == kCGMouseButtonRight) return kCGEventRightMouseUp;
+  if (b == kCGMouseButtonCenter) return kCGEventOtherMouseUp;
+  return kCGEventLeftMouseUp;
 }
-let cmd = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : ""
-switch cmd {
-case "click":
-  let p = CGPoint(x: num(2), y: num(3))
-  let b = button(CommandLine.arguments[4])
-  let n = max(1, min(Int(CommandLine.arguments[5]) ?? 1, 3))
-  for _ in 0..<n {
-    post(down(b), p, b)
-    post(up(b), p, b)
-    usleep(50_000)
+
+static void post(CGEventType type, CGPoint p, CGMouseButton b) {
+  CGEventRef e = CGEventCreateMouseEvent(NULL, type, p, b);
+  if (!e) return;
+  CGEventPost(kCGHIDEventTap, e);
+  CFRelease(e);
+}
+
+int main(int argc, char **argv) {
+  const char *cmd = argc > 1 ? argv[1] : "";
+  if (strcmp(cmd, "click") == 0) {
+    CGPoint p = CGPointMake(num(2, argc, argv), num(3, argc, argv));
+    CGMouseButton b = button_of(argc > 4 ? argv[4] : "left");
+    int n = argc > 5 ? atoi(argv[5]) : 1;
+    if (n < 1) n = 1;
+    if (n > 3) n = 3;
+    for (int i = 0; i < n; i++) {
+      post(down_type(b), p, b);
+      post(up_type(b), p, b);
+      usleep(50000);
+    }
+    return 0;
   }
-case "move":
-  let p = CGPoint(x: num(2), y: num(3))
-  CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
-case "drag":
-  let a = CGPoint(x: num(2), y: num(3))
-  let b = CGPoint(x: num(4), y: num(5))
-  let btn = button(CommandLine.arguments[6])
-  post(down(btn), a, btn)
-  usleep(30_000)
-  post(.leftMouseDragged, b, btn)
-  usleep(30_000)
-  post(up(btn), b, btn)
-case "scroll":
-  let p = CGPoint(x: num(2), y: num(3))
-  let lines = Int32(CommandLine.arguments[4]) ?? 0
-  if let e = CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1, wheel1: lines, wheel2: 0, wheel3: 0) {
-    e.location = p
-    e.post(tap: .cghidEventTap)
+  if (strcmp(cmd, "move") == 0) {
+    post(kCGEventMouseMoved, CGPointMake(num(2, argc, argv), num(3, argc, argv)), kCGMouseButtonLeft);
+    return 0;
   }
-default:
-  fputs("unknown command\n", stderr)
-  exit(2)
+  if (strcmp(cmd, "drag") == 0) {
+    CGPoint a = CGPointMake(num(2, argc, argv), num(3, argc, argv));
+    CGPoint b = CGPointMake(num(4, argc, argv), num(5, argc, argv));
+    CGMouseButton btn = button_of(argc > 6 ? argv[6] : "left");
+    CGEventType drag = btn == kCGMouseButtonRight ? kCGEventRightMouseDragged : kCGEventLeftMouseDragged;
+    post(down_type(btn), a, btn);
+    usleep(30000);
+    post(drag, b, btn);
+    usleep(30000);
+    post(up_type(btn), b, btn);
+    return 0;
+  }
+  if (strcmp(cmd, "scroll") == 0) {
+    CGPoint p = CGPointMake(num(2, argc, argv), num(3, argc, argv));
+    int lines = argc > 4 ? atoi(argv[4]) : 0;
+    CGEventRef e = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, lines);
+    if (e) {
+      CGEventSetLocation(e, p);
+      CGEventPost(kCGHIDEventTap, e);
+      CFRelease(e);
+    }
+    return 0;
+  }
+  fputs("unknown command\n", stderr);
+  return 2;
 }
 `;
 
@@ -416,23 +442,23 @@ async function macInputBin(dataDir: string): Promise<string | null> {
       return bundled;
     } catch { /* fall through to a local compile */ }
   }
-  if (!(await commandExists("swiftc"))) {
+  if (!(await commandExists("clang"))) {
     macHelper = null;
     return null;
   }
   const dir = path.join(dataDir, "bin");
   await fs.mkdir(dir, { recursive: true });
-  const hash = createHash("sha256").update(INPUT_SWIFT).digest("hex").slice(0, 12);
+  const hash = createHash("sha256").update(INPUT_C).digest("hex").slice(0, 12);
   const bin = path.join(dir, `nimbus-input-${hash}`);
   try {
     await fs.access(bin, constants.X_OK);
     macHelper = bin;
     return bin;
   } catch { /* compile */ }
-  const src = path.join(dir, `nimbus-input-${hash}.swift`);
-  await fs.writeFile(src, INPUT_SWIFT, "utf8");
+  const src = path.join(dir, `nimbus-input-${hash}.c`);
+  await fs.writeFile(src, INPUT_C, "utf8");
   try {
-    await run("swiftc", ["-O", "-o", bin, src], 90_000);
+    await run("clang", ["-O2", "-framework", "CoreGraphics", "-framework", "CoreFoundation", "-o", bin, src], 60_000);
     macHelper = bin;
     return bin;
   } catch {
@@ -481,7 +507,7 @@ async function inputMac(dataDir: string, args: string[]) {
     await osascriptClick(Number(args[1]), Number(args[2]), Number(args[4] ?? 1));
     return;
   }
-  throw new ScreenError("This click needs the Nimbus input helper. Install the signed Mac app, or on a dev machine run xcode-select --install. Left click still works without it.");
+  throw new ScreenError("This click needs the Nimbus input helper. Install the Mac app, or on a dev machine install Xcode command line tools so clang is available. Left click still works without it.");
 }
 
 async function inputLinux(args: { kind: "click" | "move" | "drag" | "scroll" | "type" | "key"; x?: number; y?: number; toX?: number; toY?: number; button?: "left" | "right" | "middle"; clicks?: number; wheel?: number; text?: string; key?: string }) {

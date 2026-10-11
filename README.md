@@ -59,7 +59,7 @@ The first public build should be signed. Add these repository secrets and the wo
 
 Without those secrets the workflow still uploads an installer. macOS Gatekeeper will ask the person to right-click the app and choose Open the first time, and Windows SmartScreen will warn. Screen Recording and Accessibility on a Mac stick to the app only after it is signed with a Developer ID.
 
-On a Mac, the build compiles a universal click helper with `swiftc` and puts it inside the app, so people do not need Xcode. The first screenshot asks for Screen Recording. The first click asks for Accessibility.
+On a Mac, the build compiles the click helper with `clang` and puts it inside the app. The first screenshot asks for Screen Recording. The first click asks for Accessibility.
 
 On Linux in a container, add Electron's `--no-sandbox` flag if the process cannot set up its sandbox.
 

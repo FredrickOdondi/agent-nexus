@@ -16,7 +16,7 @@ module.exports = {
   extraResources: [
     { from: "../server/dist", to: "server", filter: ["**/*.js", "**/*.map"] },
     { from: "../web/dist", to: "web" },
-    { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift"] },
+    { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c"] },
   ],
   mac: {
     category: "public.app-category.productivity",
