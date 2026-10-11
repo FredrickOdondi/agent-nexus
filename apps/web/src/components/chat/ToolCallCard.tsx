@@ -123,7 +123,7 @@ export function ToolCallCard({ part, defaultOpen = false }: { part: ToolCallPart
         aria-expanded={open}
       >
         <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          {part.name === "memory" ? <NimbusMark state="static" size={14} /> : <Icon className="size-3.5" />}
+          {part.name === "memory" ? <NimbusMark state="static" size={18} /> : <Icon className="size-3.5" />}
         </span>
         <span className="flex min-w-0 flex-1 items-baseline gap-2">
           <span className="shrink-0 font-medium">{part.title}</span>

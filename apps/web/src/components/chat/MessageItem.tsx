@@ -143,7 +143,7 @@ function Reasoning({ text, live, durationMs }: { text: string; live: boolean; du
   return (
     <div className="my-1.5">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-md py-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
-        <NimbusMark state={live ? "loading" : "static"} size={14} />
+        <NimbusMark state={live ? "loading" : "static"} size={18} />
         <span className={cn(live && "shimmer-text")}>{live ? "Thinking…" : `Thought${durationMs ? ` for ${Math.max(1, Math.round(durationMs / 1000))}s` : ""}`}</span>
         <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
       </button>
