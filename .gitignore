@@ -12,3 +12,5 @@ release/
 agent-tools/
 terminals/
 .pnpm-store/
+.playwright-mcp/
+apps/web/dist/

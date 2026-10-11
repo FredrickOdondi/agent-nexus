@@ -1,0 +1,19 @@
+{
+  "name": "@nimbus/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Nimbus desktop shell. A thin Electron window around the local server and web client.",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp preload.cjs dist/preload.cjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "pnpm run build && electron . --dev",
+    "start": "pnpm run build && electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "electron": "^33.4.11",
+    "typescript": "^5.9.3"
+  }
+}
