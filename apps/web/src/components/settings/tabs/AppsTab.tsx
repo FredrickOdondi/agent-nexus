@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, ExternalLink, Eye, EyeOff, KeyRound, Loader2, Plug, RefreshCw, Search } from "lucide-react";
+import { Check, ExternalLink, Eye, EyeOff, KeyRound, Loader2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { ComposioAppState, ComposioKeySource } from "@nimbus/shared";
 import { Button } from "@/components/ui/button";
@@ -118,39 +118,41 @@ export function AppsTab() {
 
   return (
     <div>
-      <Section title="Connected apps" description="Link Gmail, GitHub, Slack, and the rest. The agent searches those apps and runs actions during a chat. The key stays on this computer and is never sent to your phone.">
+      <Section title="Connected apps" description="The agent can use the accounts you link. The key stays on this computer.">
         <ToggleRow
           label="Let the agent use connected apps"
-          hint="Turn this off to hide app tools without deleting the key or the accounts you already linked."
+          hint="Turn this off to hide app tools. Linked accounts stay saved."
           checked={enabled}
           onChange={(value) => void send({ type: "settings.update", patch: { composioEnabled: value } }).catch((error) => toast.error((error as Error).message))}
         />
-        <Field label="Composio API key" hint={source === "env" ? "Using COMPOSIO_API_KEY from the environment. A key saved here replaces it." : source === "settings" ? "Saved on this computer. Paste a new key to replace it." : "Create a key at dashboard.composio.dev. You can also set COMPOSIO_API_KEY before starting Nimbus."}>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <KeyRound className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input type={showKey ? "text" : "password"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={source === "none" ? "ak_…" : "••••••••"} className="pr-9 pl-8 font-mono text-xs" autoComplete="off" />
-              <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label={showKey ? "Hide key" : "Show key"}>{showKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}</button>
+        <Field label="Composio API key" hint={source === "env" ? "Using COMPOSIO_API_KEY from the environment. A key saved here replaces it." : source === "settings" ? "Saved on this computer. Paste a new key to replace it." : "Create a key at dashboard.composio.dev, or set COMPOSIO_API_KEY before starting Nimbus."}>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+            <div className="relative min-w-0 flex-1">
+              <KeyRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input type={showKey ? "text" : "password"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={source === "none" ? "ak_…" : "••••••••"} className="h-11 pr-12 pl-9 font-mono text-base lg:h-9 lg:text-xs" autoComplete="off" />
+              <button type="button" onClick={() => setShowKey((s) => !s)} className="absolute top-1/2 right-1 flex size-10 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground" aria-label={showKey ? "Hide key" : "Show key"}>{showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
             </div>
-            <Button onClick={() => void saveKey()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : saved ? <Check /> : null}Save</Button>
-            {source === "settings" && <Button variant="outline" onClick={() => void clearKey()}>Remove</Button>}
+            <div className={cn("grid gap-2", source === "settings" ? "grid-cols-2" : "grid-cols-1", "lg:flex lg:shrink-0")}>
+              <Button className="h-11 lg:h-9" onClick={() => void saveKey()} disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : saved ? <Check /> : null}Save</Button>
+              {source === "settings" && <Button variant="outline" className="h-11 lg:h-9" onClick={() => void clearKey()}>Remove</Button>}
+            </div>
           </div>
         </Field>
       </Section>
 
-      <Section title="Apps" description="The full Composio directory. Connect an account, then ask in chat. In Ask mode, actions that change data wait for your approval.">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? `${list.length} apps. Open a connect link, approve access, then come back.` : "Save a key to load the full directory and see which accounts are already connected."}</p>
-          <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading}><RefreshCw className={cn(loading && "animate-spin")} />Refresh</Button>
+      <Section title="Directory" description="Search, then connect. In Ask mode, actions that change data wait for your approval.">
+        <div className="flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search apps" className="h-11 rounded-xl pl-9 text-base lg:h-9 lg:text-sm" />
+          </div>
+          <Button variant="outline" size="icon" className="size-11 shrink-0 rounded-xl lg:size-9" onClick={() => void load()} disabled={loading} aria-label="Refresh apps"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></Button>
         </div>
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Gmail, Figma, HubSpot…" className="h-11 rounded-xl pl-9 text-base lg:h-9 lg:text-sm" />
-        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? `${filtered.length} of ${list.length} apps. Approve access in the browser, then come back.` : "Save a key to load every app and see which accounts are connected."}</p>
         {loading && list.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading apps…</div>
         ) : filtered.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No app matches “{query.trim()}”. Connect it by slug below if Composio has it.</p>
+          <p className="text-sm text-muted-foreground">Nothing matches “{query.trim()}”. Connect it by slug below.</p>
         ) : (
           <div className="space-y-5">
             {ready.length > 0 && <AppGroup title="Ready" apps={ready} busy={busy} canConnect={source !== "none" && enabled} onConnect={connect} />}
@@ -159,10 +161,10 @@ export function AppsTab() {
             ))}
           </div>
         )}
-        <Field label="Connect by slug" hint="Use this when an app is missing from the directory. The slug is the Composio id, such as figma or hubspot.">
-          <div className="flex gap-2">
-            <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="figma" className="font-mono text-xs" />
-            <Button variant="outline" disabled={!custom.trim() || busy === custom.trim().toLowerCase() || source === "none" || !enabled} onClick={() => void connect(custom)}>
+        <Field label="Connect by slug" hint="For an app that is not in the list. Example: figma">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="figma" className="h-11 font-mono text-base lg:h-9 lg:text-xs" />
+            <Button variant="outline" className="h-11 shrink-0 lg:h-8" disabled={!custom.trim() || busy === custom.trim().toLowerCase() || source === "none" || !enabled} onClick={() => void connect(custom)}>
               <ExternalLink />Connect
             </Button>
           </div>
@@ -176,21 +178,28 @@ function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string;
   if (apps.length === 0) return null;
   return (
     <div>
-      <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{title}</p>
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <p className="mb-2 px-1 text-[13px] font-medium text-muted-foreground">{title}</p>
+      <ul className="overflow-hidden rounded-2xl border bg-surface lg:grid lg:grid-cols-2 lg:gap-2 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {apps.map((app) => {
           const ready = app.connected || app.noAuth;
+          const pending = busy === app.slug;
           return (
-            <li key={app.slug} className="flex items-center gap-3 rounded-xl border bg-surface px-3 py-2.5">
-              {app.logo ? <img src={app.logo} alt="" loading="lazy" className="size-8 rounded-md bg-white object-contain" /> : <span className="flex size-8 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">{app.name.slice(0, 1)}</span>}
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{app.name}</span>
-                <span className="block truncate text-xs text-muted-foreground">{ready ? (app.noAuth && !app.connected ? "No sign-in required" : "Connected") : app.blurb}</span>
-              </span>
-              <Button size="sm" variant={ready ? "outline" : "secondary"} className="max-lg:h-10" disabled={busy === app.slug || !canConnect} onClick={() => onConnect(app.slug)}>
-                {busy === app.slug ? <Loader2 className="animate-spin" /> : ready ? <Check /> : <Plug />}
-                {ready ? "Reconnect" : "Connect"}
-              </Button>
+            <li key={app.slug} className="border-b last:border-b-0 lg:rounded-xl lg:border lg:bg-surface">
+              <button
+                type="button"
+                disabled={pending || !canConnect}
+                onClick={() => onConnect(app.slug)}
+                className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted disabled:active:bg-transparent"
+              >
+                {app.logo ? <img src={app.logo} alt="" loading="lazy" className="size-10 shrink-0 rounded-xl bg-white object-contain p-1" /> : <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-semibold text-muted-foreground">{app.name.slice(0, 1)}</span>}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] leading-tight font-medium">{app.name}</span>
+                  <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{ready ? (app.noAuth && !app.connected ? "No sign-in required" : "Connected") : app.blurb}</span>
+                </span>
+                <span className="flex w-[4.75rem] shrink-0 items-center justify-end">
+                  {pending ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : ready ? <Check className="size-5 text-success" /> : <span className="text-[15px] font-semibold whitespace-nowrap text-primary">Connect</span>}
+                </span>
+              </button>
             </li>
           );
         })}
