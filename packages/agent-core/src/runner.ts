@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { Citation, Message, Part, ProviderSettings, QuestionOption, TodoItem, ToolCallPart, ToolDisplay } from "@nimbus/shared";
 import { newId } from "@nimbus/shared";
+import { composioToolDefinitions } from "./composio.js";
 import { createMemoryStore, createSkillCatalog, loadProjectRules } from "./discovery.js";
 import { discoverHooks, runHooks } from "./hooks.js";
 import { McpManager } from "./mcp.js";
@@ -50,11 +51,20 @@ export interface RunOptions {
   profile?: Profile;
   provider: ProviderSettings;
   permission: { mode: PermissionConfig["mode"]; allow: string[]; deny: string[] };
-  settings: { webSearchEnabled: boolean; subagentsEnabled: boolean; memoryEnabled: boolean; mcpServers: { id: string; name: string; transport: "stdio" | "http"; command?: string; args?: string[]; url?: string; enabled: boolean }[]; systemPromptAddendum: string };
+  settings: {
+    webSearchEnabled: boolean;
+    subagentsEnabled: boolean;
+    memoryEnabled: boolean;
+    mcpServers: { id: string; name: string; transport: "stdio" | "http"; command?: string; args?: string[]; url?: string; enabled: boolean }[];
+    systemPromptAddendum: string;
+    composio?: { apiKey: string; userId: string; sessionId?: string };
+  };
   history: Message[];
   signal: AbortSignal;
   maxTurns?: number;
   platformName?: string;
+  /** Persist a newly created Composio session id. */
+  onComposioSession?: (sessionId: string) => void;
   /** Shared across runs in one process so MCP connections are reused. */
   mcp?: McpManager;
   /** Shared "allow always" grants for this conversation. */
@@ -206,6 +216,15 @@ export class AgentRunner {
     for (const server of this.opts.settings.mcpServers.filter((s) => s.enabled)) {
       for (const t of await mcp.connect(server, (m) => this.sink.log("info", m))) this.registry.registerDynamic(t);
     }
+    const composio = this.opts.settings.composio;
+    if (composio && profile === "main") {
+      try {
+        const extra = await composioToolDefinitions({ ...composio, onSessionId: this.opts.onComposioSession });
+        for (const tool of extra) this.registry.registerDynamic(tool);
+      } catch (error) {
+        this.sink.log("warn", `Connected apps are unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     this.tools = this.registry.finalize({
       subagentsEnabled: this.opts.settings.subagentsEnabled && profile === "main",
       webSearchEnabled: this.opts.settings.webSearchEnabled,
@@ -214,7 +233,8 @@ export class AgentRunner {
       profile,
     });
     if (this.opts.mode === "chat") {
-      this.tools = this.tools.filter((t) => ["web_search", "web_fetch", "image_gen", "memory", "ask_user_question"].includes(t.id));
+      const chatTools = new Set(["web_search", "web_fetch", "image_gen", "memory", "ask_user_question"]);
+      this.tools = this.tools.filter((tool) => chatTools.has(tool.id) || tool.id.startsWith("COMPOSIO_"));
     }
     this.hooks = await discoverHooks(this.opts.cwd);
     const services = this.buildServices();

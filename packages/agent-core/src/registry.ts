@@ -91,7 +91,7 @@ export class ToolRegistry {
       title: t.title,
       category: t.category,
       description: t.description,
-      source: t.id.startsWith("mcp__") ? "mcp" : "builtin",
+      source: t.source ?? (t.id.startsWith("mcp__") ? "mcp" : t.id.startsWith("COMPOSIO_") ? "composio" : "builtin"),
       enabled: true,
     }));
   }

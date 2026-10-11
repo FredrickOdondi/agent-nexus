@@ -5,6 +5,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import QRCode from "qrcode";
 import type { HealthInfo, PairingTicket, Platform } from "@nimbus/shared";
+import { composioConnect, composioStatus } from "./composio-host.js";
 import type { Db } from "./db.js";
 import type { ServerConfig } from "./config.js";
 import type { SpaceService } from "./space.js";
@@ -80,6 +81,33 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#0b0b0f", light: "#ffffff" } });
     const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: hosts.map((host) => uiOrigin(cfg, host)) };
     return c.json(ticket);
+  });
+
+  const authed = (header: string | undefined) => {
+    const token = header?.replace(/^Bearer\s+/i, "");
+    const dev = token ? db.deviceByToken(token) : null;
+    return dev && dev.spaceId === space.spaceId ? dev : null;
+  };
+
+  /** Connected-app catalog. The API key never leaves the host. */
+  app.get("/api/composio/apps", async (c) => {
+    if (!authed(c.req.header("authorization"))) return c.json({ error: "unauthorized" }, 401);
+    return c.json(await composioStatus(space));
+  });
+
+  app.post("/api/composio/connect", async (c) => {
+    if (!authed(c.req.header("authorization"))) return c.json({ error: "unauthorized" }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { toolkit?: string };
+    const toolkit = String(body.toolkit ?? "").trim().toLowerCase();
+    if (!/^[a-z0-9_-]{2,64}$/.test(toolkit)) return c.json({ error: "Enter an app slug such as gmail or github." }, 400);
+    try {
+      const result = await composioConnect(space, toolkit);
+      if (!result.redirectUrl) return c.json({ error: "Composio did not return a connect link for that app." }, 502);
+      return c.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not start the connection";
+      return c.json({ error: message.slice(0, 300) }, 400);
+    }
   });
 
   /** Exchange a pairing code for a device token (called by the phone). */

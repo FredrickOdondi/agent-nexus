@@ -207,14 +207,36 @@ export interface SpaceSettings {
   allowRules: string[];
   denyRules: string[];
   systemPromptAddendum: string;
+  /** When false, the agent does not receive connected-app tools. */
+  composioEnabled: boolean;
+  /** Present only server-side. Clients receive `hasComposioApiKey` and `composioKeySource`. */
+  composioApiKey?: string;
+  hasComposioApiKey?: boolean;
+  composioKeySource?: ComposioKeySource;
+  /** Stable Composio user id for this space. Server-side. */
+  composioUserId?: string;
+  /** Reused tool-router session. Server-side. */
+  composioSessionId?: string;
 }
+
+/** An app the user can connect so the agent can act in it. */
+export interface ComposioAppState {
+  slug: string;
+  name: string;
+  blurb: string;
+  logo?: string;
+  connected: boolean;
+  noAuth: boolean;
+}
+
+export type ComposioKeySource = "settings" | "env" | "none";
 
 export interface ToolInfo {
   id: string;
   title: string;
   category: "file" | "search" | "shell" | "workflow" | "external" | "custom";
   description: string;
-  source: "builtin" | "provider" | "mcp";
+  source: "builtin" | "provider" | "mcp" | "composio";
   enabled: boolean;
 }
 

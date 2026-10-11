@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { ClientMessage, Conversation, Device, Message, ServerMessage, SpaceSettings } from "@nimbus/shared";
-import { BUILTIN_TOOL_CATALOG, deriveTitle, newId, truncate } from "@nimbus/shared";
+import { BUILTIN_TOOL_CATALOG, COMPOSIO_META_TOOLS, deriveTitle, newId, truncate } from "@nimbus/shared";
 import { createSkillCatalog } from "@nimbus/agent-core";
 import type { Db } from "./db.js";
 import type { RunManager } from "./runs.js";
@@ -106,15 +106,20 @@ export class Hub {
         conversations: this.space.listConversations(),
         settings: redactSettings(settings),
         devices: this.space.listDevices(),
-        tools: BUILTIN_TOOL_CATALOG.map((t) => ({
-          ...t,
-          enabled:
-            t.source === "provider" ? providerHosted
-            : t.id === "task" ? settings.subagentsEnabled
-            : t.id === "memory" ? settings.memoryEnabled
-            : t.id === "web_search" ? settings.webSearchEnabled
-            : true,
-        })),
+        tools: [
+          ...BUILTIN_TOOL_CATALOG.map((t) => ({
+            ...t,
+            enabled:
+              t.source === "provider" ? providerHosted
+              : t.id === "task" ? settings.subagentsEnabled
+              : t.id === "memory" ? settings.memoryEnabled
+              : t.id === "web_search" ? settings.webSearchEnabled
+              : true,
+          })),
+          ...(settings.composioEnabled !== false && (settings.composioApiKey || process.env.COMPOSIO_API_KEY)
+            ? COMPOSIO_META_TOOLS.map((t) => ({ ...t, enabled: true }))
+            : []),
+        ],
         skills,
         pendingApprovals: this.runs.pendingApprovals(),
         runs: this.runs.statuses(),
@@ -235,10 +240,22 @@ export class Hub {
 
       case "settings.update": {
         const current = this.space.getSettings();
-        const { provider: providerPatch, ...rest } = msg.patch;
+        const { provider: providerPatch, hasComposioApiKey: _has, composioKeySource: _source, composioSessionId: _session, composioUserId: _user, ...rest } = msg.patch;
         const next: SpaceSettings = { ...current, ...rest, provider: { ...current.provider, ...(providerPatch ?? {}) } };
         if (providerPatch && "apiKey" in providerPatch && !providerPatch.apiKey) delete next.provider.apiKey;
         delete next.provider.hasApiKey;
+        if ("composioApiKey" in msg.patch) {
+          const incoming = typeof msg.patch.composioApiKey === "string" ? msg.patch.composioApiKey.trim() : "";
+          if (!incoming) {
+            delete next.composioApiKey;
+            delete next.composioSessionId;
+          } else if (incoming !== current.composioApiKey) {
+            next.composioApiKey = incoming;
+            delete next.composioSessionId;
+          }
+        }
+        delete next.hasComposioApiKey;
+        delete next.composioKeySource;
         this.space.saveSettings(next);
         return ack();
       }

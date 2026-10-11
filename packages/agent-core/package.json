@@ -16,6 +16,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@composio/core": "^0.22.0",
     "@modelcontextprotocol/sdk": "^1.27.0",
     "@nimbus/shared": "workspace:*",
     "fast-glob": "^3.3.3",

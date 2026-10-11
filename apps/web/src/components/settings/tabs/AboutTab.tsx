@@ -28,6 +28,7 @@ export function AboutTab() {
           <li><span className="text-foreground">ToolRegistry → ToolBridge + SessionContext</span>: tools are composed per session; capabilities without a backing resource are removed, not advertised.</li>
           <li><span className="text-foreground">Built-in tools</span>: run_terminal_cmd, read_file, write_file, search_replace, list_dir, glob, grep, web_search, web_fetch, todo_write, task, get_task_output, ask_user_question, memory, plan mode, skill, image_gen.</li>
           <li><span className="text-foreground">Provider-hosted tools</span>: xAI Agent Tools API (web_search, x_search, code_execution) run inside the model request.</li>
+          <li><span className="text-foreground">Connected apps</span>: Composio sessions let the agent search, connect, and run Gmail, GitHub, Slack, and other apps. The API key stays on this computer.</li>
           <li><span className="text-foreground">Governance</span>: permission modes and ToolPrefix(glob) rules, PreToolUse/PostToolUse hooks, AGENTS.md rules, SKILL.md skills, MCP servers, checkpoints with rewind.</li>
           <li><span className="text-foreground">Sync</span>: a per-space event log with monotonic sequence numbers; every device replays what it missed, like WhatsApp multi-device.</li>
         </ul>

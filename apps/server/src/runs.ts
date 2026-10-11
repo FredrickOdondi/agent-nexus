@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import type { ApprovalRequest, Conversation, Message, Part, QuestionOption, RunStatus, TodoItem } from "@nimbus/shared";
 import { deriveTitle, messageText, newId, truncate } from "@nimbus/shared";
 import { AgentRunner, McpManager, type ApprovalAnswer, type ApprovalPrompt, type RunSink } from "@nimbus/agent-core";
+import { rememberComposioSession, composioRuntime } from "./composio-host.js";
 import type { SpaceService } from "./space.js";
 
 interface ActiveRun {
@@ -203,12 +204,14 @@ export class RunManager {
           memoryEnabled: settings.memoryEnabled,
           mcpServers: settings.mcpServers,
           systemPromptAddendum: settings.systemPromptAddendum,
+          composio: composioRuntime(settings, this.space.spaceId),
         },
         history,
         signal: controller.signal,
         platformName: this.platformName,
         mcp: this.mcp,
         sessionAllow: allow,
+        onComposioSession: (sessionId) => rememberComposioSession(this.space, sessionId),
       },
       sink,
     );

@@ -15,6 +15,7 @@ import {
   ListChecks,
   Loader2,
   Lock,
+  Plug,
   Search,
   ShieldAlert,
   Sparkles,
@@ -64,6 +65,10 @@ function headline(part: ToolCallPart): string {
     case "skill": return String(a.name ?? "");
     case "image_gen": return String(a.prompt ?? "");
     default: {
+      if (part.name.startsWith("COMPOSIO_")) {
+        const query = a.query ?? a.toolkit ?? a.tool_slug ?? a.use_case;
+        if (typeof query === "string") return query;
+      }
       const first = Object.values(a).find((v) => typeof v === "string");
       return first ? String(first) : "";
     }
@@ -83,7 +88,7 @@ function StatusIcon({ status }: { status: ToolCallPart["status"] }) {
 
 export function ToolCallCard({ part, defaultOpen = false }: { part: ToolCallPart; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
-  const Icon = ICONS[part.name] ?? Wrench;
+  const Icon = part.name.startsWith("COMPOSIO_") ? Plug : (ICONS[part.name] ?? Wrench);
   const title = headline(part);
   const duration = part.startedAt && part.endedAt ? Math.max(0, part.endedAt - part.startedAt) : null;
   const expandable = Boolean(part.display || part.result || part.error);

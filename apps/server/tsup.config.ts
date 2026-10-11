@@ -15,6 +15,6 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   noExternal: [/^@nimbus\//, "hono", "@hono/node-server", "ws", "qrcode", "fast-glob", "ignore", "node-html-markdown"],
-  external: ["@modelcontextprotocol/sdk"],
+  external: ["@modelcontextprotocol/sdk", "@composio/core", "@composio/client"],
   banner: { js: "#!/usr/bin/env node\nimport { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
 });

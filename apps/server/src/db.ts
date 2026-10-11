@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = (workspacePath: string): SpaceSettings => ({
   allowRules: ["Read(*)", "Grep(*)", "WebFetch(*)"],
   denyRules: ["Bash(rm -rf /*)", "Bash(git push --force*)"],
   systemPromptAddendum: "",
+  composioEnabled: true,
 });
 
 export function hashToken(token: string): string {

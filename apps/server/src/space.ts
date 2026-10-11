@@ -96,5 +96,13 @@ export class SpaceService {
 
 export function redactSettings(s: SpaceSettings): SpaceSettings {
   const { apiKey, ...provider } = s.provider;
-  return { ...s, provider: { ...provider, hasApiKey: Boolean(apiKey) } };
+  const { composioApiKey, composioSessionId: _session, composioUserId: _user, ...rest } = s;
+  const fromSettings = Boolean(composioApiKey);
+  const fromEnv = Boolean(process.env.COMPOSIO_API_KEY);
+  return {
+    ...rest,
+    provider: { ...provider, hasApiKey: Boolean(apiKey) },
+    hasComposioApiKey: fromSettings || fromEnv,
+    composioKeySource: fromSettings ? "settings" : fromEnv ? "env" : "none",
+  };
 }

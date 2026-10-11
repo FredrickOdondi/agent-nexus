@@ -57,6 +57,16 @@ export function renderSystemPrompt(ctx: PromptContext): string {
     lines.push("");
   }
 
+  if (ctx.tools.some((tool) => tool.id.startsWith("COMPOSIO_"))) {
+    lines.push("# Connected apps");
+    lines.push("The user can connect outside apps (Gmail, GitHub, Slack, Notion, and others). Use the Composio tools for anything that lives in those apps.");
+    lines.push("- Call COMPOSIO_SEARCH_TOOLS before you act. Do not invent tool slugs.");
+    lines.push("- If a toolkit is not connected, call COMPOSIO_MANAGE_CONNECTIONS and give the user the connect link. Wait until they finish before retrying.");
+    lines.push("- Run the action with COMPOSIO_MULTI_EXECUTE_TOOL. Ask before you create, update, or delete their data.");
+    lines.push("- If a tool result contains a connect or redirect URL, show that URL to the user.");
+    lines.push("");
+  }
+
   if (ctx.skills.length) {
     lines.push("# Skills");
     lines.push("Load a skill with the `skill` tool when a task matches its description:");

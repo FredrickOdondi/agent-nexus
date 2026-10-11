@@ -37,6 +37,8 @@ export interface ToolDefinition<A = Record<string, unknown>> {
   id: string;
   title: string;
   category: ToolCategory;
+  /** Where the tool came from. Defaults from the id when omitted. */
+  source?: "builtin" | "provider" | "mcp" | "composio";
   description: string;
   parameters: JsonSchema;
   /** Which permission prefix gates this tool (Bash, Edit, Write, Read, Grep, WebFetch, MCPTool). */

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, FolderOpen, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { McpServerConfig, PermissionMode } from "@nimbus/shared";
-import { newId } from "@nimbus/shared";
+import { COMPOSIO_META_TOOLS, newId } from "@nimbus/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,11 @@ const MODES: { value: PermissionMode; label: string; hint: string }[] = [
 export function AgentTab() {
   const settings = useStore((s) => s.settings);
   const tools = useStore((s) => s.tools);
+  const showComposio = Boolean(settings?.hasComposioApiKey && settings.composioEnabled !== false);
+  const visibleTools = [
+    ...tools.filter((tool) => showComposio || tool.source !== "composio"),
+    ...COMPOSIO_META_TOOLS.filter((meta) => showComposio && !tools.some((tool) => tool.id === meta.id)).map((tool) => ({ ...tool, enabled: true })),
+  ];
   const skills = useStore((s) => s.skills);
   const send = useStore((s) => s.send);
   const [workspace, setWorkspace] = useState("");
@@ -96,9 +101,9 @@ export function AgentTab() {
 
       <Section title="Tools" description="Everything the model can call this session.">
         <div className="flex flex-wrap gap-1.5">
-          {tools.map((t) => (
+          {visibleTools.map((t) => (
             <Badge key={t.id} variant={t.enabled ? "secondary" : "outline"} className={cn("h-6 gap-1 px-2 font-mono text-[11px]", !t.enabled && "opacity-50")} title={t.description}>
-              {t.title}{t.source === "provider" && <span className="text-[9px] text-primary">xAI</span>}
+              {t.title}{t.source === "provider" && <span className="text-[9px] text-primary">xAI</span>}{t.source === "composio" && <span className="text-[9px] text-primary">app</span>}
             </Badge>
           ))}
         </div>

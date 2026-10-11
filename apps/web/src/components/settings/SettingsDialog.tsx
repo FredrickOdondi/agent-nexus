@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Bot, Cpu, Info, Palette, Smartphone } from "lucide-react";
+import { Bot, Cpu, Info, Palette, Plug, Smartphone } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { AboutTab } from "./tabs/AboutTab";
 import { AgentTab } from "./tabs/AgentTab";
+import { AppsTab } from "./tabs/AppsTab";
 import { AppearanceTab } from "./tabs/AppearanceTab";
 import { DevicesTab } from "./tabs/DevicesTab";
 import { ModelTab } from "./tabs/ModelTab";
@@ -12,6 +13,7 @@ import { ModelTab } from "./tabs/ModelTab";
 const TABS = [
   { id: "model", label: "Model", icon: Cpu },
   { id: "agent", label: "Agent & tools", icon: Bot },
+  { id: "apps", label: "Apps", icon: Plug },
   { id: "devices", label: "Devices", icon: Smartphone },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "about", label: "About", icon: Info },
@@ -30,7 +32,7 @@ export function SettingsDialog() {
       <DialogContent className="flex h-[min(680px,92dvh)] w-[min(880px,96vw)] max-w-[96vw] flex-col gap-0 overflow-hidden p-0 sm:max-w-none sm:flex-row" showCloseButton>
         <DialogHeader className="sr-only">
           <DialogTitle>Settings</DialogTitle>
-          <DialogDescription>Configure your model, agent tools, linked devices and appearance.</DialogDescription>
+          <DialogDescription>Configure your model, connected apps, agent tools, linked devices and appearance.</DialogDescription>
         </DialogHeader>
         <nav className={cn("shrink-0 border-b bg-sidebar p-2 sm:w-52 sm:border-r sm:border-b-0 sm:p-3", !mobileList && "hidden sm:block")} aria-label="Settings sections">
           <p className="hidden px-2 pt-1 pb-2 text-sm font-semibold sm:block">Settings</p>
@@ -51,6 +53,7 @@ export function SettingsDialog() {
         <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           {tab === "model" && <ModelTab />}
           {tab === "agent" && <AgentTab />}
+          {tab === "apps" && <AppsTab />}
           {tab === "devices" && <DevicesTab />}
           {tab === "appearance" && <AppearanceTab />}
           {tab === "about" && <AboutTab />}

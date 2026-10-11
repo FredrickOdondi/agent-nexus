@@ -7,3 +7,5 @@ export * from "./hooks.js";
 export * from "./prompt.js";
 export * from "./providers/index.js";
 export { McpManager } from "./mcp.js";
+export { composioToolDefinitions, connectComposioApp, listComposioApps, openComposioSession } from "./composio.js";
+export type { OpenComposioInput } from "./composio.js";
