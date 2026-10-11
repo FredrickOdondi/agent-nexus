@@ -17,6 +17,7 @@ interface Props {
   /** Pre-filled code from a `#/pair/123456` deep link (QR scan). */
   initialCode?: string;
   onLinked(): void;
+  onPhase?(phase: Phase): void;
 }
 
 type Phase = "probing" | "code" | "claiming" | "blocked" | "done";
@@ -26,7 +27,7 @@ type Phase = "probing" | "code" | "claiming" | "blocked" | "done";
  * local browser) we bootstrap the primary token silently. Everywhere else we
  * ask for the 6-digit pairing code shown in the desktop's Devices settings.
  */
-export function LinkDevice({ initialCode, onLinked }: Props) {
+export function LinkDevice({ initialCode, onLinked, onPhase }: Props) {
   const [phase, setPhase] = useState<Phase>(initialCode ? "claiming" : "probing");
   const [digits, setDigits] = useState<string[]>(() => (initialCode ?? "").padEnd(6, " ").split("").map((d) => d.trim()));
   const [name, setName] = useState(() => localStorage.getItem(DEVICE_NAME_KEY) ?? defaultDeviceName());
@@ -34,6 +35,8 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
   const signOut = useStore((s) => s.signOut);
   const userId = useAuth().session?.user.id;
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => { onPhase?.(phase); }, [phase, onPhase]);
 
   function remember(token: string) {
     if (userId) saveTokenForUser(userId, token);

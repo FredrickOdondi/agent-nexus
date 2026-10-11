@@ -12,7 +12,7 @@ const POINTS = [
   { icon: Smartphone, title: "The phone is a second screen", body: "Pair it after you sign in. It joins this account over Wi-Fi." },
 ];
 
-export function SignIn() {
+export function SignIn({ leaving = false }: { leaving?: boolean }) {
   const [pending, setPending] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [redirectUrl, setRedirectUrl] = useState("");
@@ -91,11 +91,11 @@ export function SignIn() {
             type="button"
             variant="outline"
             className="mt-8 h-12 w-full rounded-xl bg-background text-base elevation-1"
-            disabled={pending}
+            disabled={pending || leaving}
             onClick={() => void start()}
           >
-            {pending ? <Loader2 className="animate-spin" /> : <GoogleMark />}
-            {pending ? "Opening Google…" : "Continue with Google"}
+            {pending || leaving ? <Loader2 className="animate-spin" /> : <GoogleMark />}
+            {pending ? "Opening Google…" : leaving ? "Opening your workspace…" : "Continue with Google"}
           </Button>
           <p className="mt-3 text-center text-xs text-muted-foreground">Opens Google in this browser, then returns here.</p>
 

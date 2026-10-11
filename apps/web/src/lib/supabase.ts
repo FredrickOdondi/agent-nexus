@@ -63,6 +63,7 @@ export async function finishSignInWithCode(code: string): Promise<void> {
 
 export async function signInWithGoogle(): Promise<void> {
   if (location.hash) sessionStorage.setItem("nimbus.returnHash", location.hash);
+  sessionStorage.setItem("nimbus.signingIn", "1");
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {

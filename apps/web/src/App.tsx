@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -114,56 +114,143 @@ export default function App() {
 
   // A fresh QR scan while already linked re-links as a new device.
   const showLink = !linked || Boolean(pairCode);
-
-  let screen: "loading" | "signin" | "error" | "link" | "app" = "app";
-  if (!ready || (session && accountGate === "checking")) screen = "loading";
-  else if (!session) screen = "signin";
-  else if (accountGate === "error") screen = "error";
-  else if (showLink) screen = "link";
+  const [linkPhase, setLinkPhase] = useState<"probing" | "code" | "claiming" | "blocked" | "done" | null>(null);
+  const [cameFromLogin] = useState(() => sessionStorage.getItem("nimbus.signingIn") === "1" || new URLSearchParams(location.search).has("code"));
+  const [holdLogin, setHoldLogin] = useState(cameFromLogin);
+  const reducedMotion = useReducedMotion();
+  const quietBootstrap = Boolean(session) && showLink && !pairCode && linkPhase !== "code" && linkPhase !== "blocked";
+  const workspaceReady = Boolean(session) && accountGate === "ready" && !quietBootstrap;
 
   useEffect(() => {
-    document.documentElement.classList.toggle("workspace", screen === "app");
+    if (!cameFromLogin || !holdLogin) return;
+    if (accountGate === "error") {
+      sessionStorage.removeItem("nimbus.signingIn");
+      setHoldLogin(false);
+      return;
+    }
+    if (!workspaceReady) return;
+    const delay = reducedMotion ? 0 : 420;
+    const timer = window.setTimeout(() => {
+      sessionStorage.removeItem("nimbus.signingIn");
+      setHoldLogin(false);
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [accountGate, cameFromLogin, holdLogin, reducedMotion, workspaceReady]);
+
+  const presentLogin = !session || ((accountGate === "checking" || quietBootstrap || holdLogin) && cameFromLogin);
+  let visual: "loading" | "signin" | "error" | "link" | "app" = "app";
+  if (!ready && !session) visual = cameFromLogin && holdLogin ? "signin" : "loading";
+  else if (accountGate === "error") visual = "error";
+  else if (presentLogin) visual = "signin";
+  else if (accountGate === "checking") visual = "loading";
+  else if (showLink) visual = "link";
+  else visual = "app";
+
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("workspace", visual === "app");
     return () => document.documentElement.classList.remove("workspace");
-  }, [screen]);
+  }, [visual]);
+
+  const finishLink = () => {
+    if (location.hash.startsWith("#/pair/")) history.replaceState(null, "", location.pathname);
+    setPairCode(undefined);
+    setLinked(true);
+  };
 
   return (
     <TooltipProvider delay={300}>
-      <AnimatePresence mode="wait" initial={false}>
-        {screen === "loading" ? (
-          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
-            Checking your account…
-          </motion.div>
-        ) : screen === "signin" ? (
-          <motion.div key="signin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }}>
-            <SignIn />
-          </motion.div>
-        ) : screen === "error" ? (
-          <motion.div key="account-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 text-center">
-            <h1 className="text-xl font-semibold tracking-tight">Couldn’t open your account</h1>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{accountError}</p>
-            <button type="button" onClick={() => setAccountTry((n) => n + 1)} className="mt-6 h-12 rounded-xl bg-primary px-5 text-base font-medium text-primary-foreground">Try again</button>
-            <button type="button" onClick={() => void signOut()} className="mt-3 h-12 rounded-xl px-5 text-base font-medium text-muted-foreground">Sign out</button>
-          </motion.div>
-        ) : screen === "link" ? (
-          <motion.div key="link" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }}>
-            <LinkDevice
-              initialCode={pairCode}
-              onLinked={() => {
-                if (location.hash.startsWith("#/pair/")) history.replaceState(null, "", location.pathname);
-                setPairCode(undefined);
-                setLinked(true);
-              }}
-            />
-          </motion.div>
-        ) : (
-          <motion.div key="app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-            <Shell />
+      <div className="relative h-dvh overflow-hidden bg-background">
+        <AnimatePresence initial={false} mode="sync">
+          {visual === "loading" ? (
+            <Stage key="loading" reduced={reducedMotion} enter="fade" exit="fade" className="z-10">
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Checking your account…</div>
+            </Stage>
+          ) : visual === "signin" ? (
+            <Stage key="signin" reduced={reducedMotion} enter="fade" exit="through" className="signin-stage z-10">
+              <SignIn leaving={Boolean(session) && visual === "signin"} />
+            </Stage>
+          ) : visual === "error" ? (
+            <Stage key="account-error" reduced={reducedMotion} enter="fade" exit="fade" className="z-10">
+              <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+                <h1 className="text-xl font-semibold tracking-tight">Couldn’t open your account</h1>
+                <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{accountError}</p>
+                <button type="button" onClick={() => setAccountTry((n) => n + 1)} className="mt-6 h-12 rounded-xl bg-primary px-5 text-base font-medium text-primary-foreground">Try again</button>
+                <button type="button" onClick={() => void signOut()} className="mt-3 h-12 rounded-xl px-5 text-base font-medium text-muted-foreground">Sign out</button>
+              </div>
+            </Stage>
+          ) : visual === "app" ? (
+            <Stage key="app" reduced={reducedMotion} enter="rise" exit="fade" className="workspace z-20">
+              <Shell />
+            </Stage>
+          ) : null}
+        </AnimatePresence>
+        {session && showLink && (
+          <motion.div
+            className="absolute inset-0 z-30"
+            initial={false}
+            animate={{ opacity: visual === "link" ? 1 : 0 }}
+            style={{ visibility: visual === "link" ? "visible" : "hidden" }}
+            transition={reducedMotion || visual !== "link" ? { duration: 0 } : { duration: 0.45, ease: STAGE_EASE }}
+          >
+            <LinkDevice initialCode={pairCode} onPhase={setLinkPhase} onLinked={finishLink} />
           </motion.div>
         )}
-      </AnimatePresence>
+      </div>
       <Toaster position="top-center" richColors closeButton />
     </TooltipProvider>
   );
+}
+
+const STAGE_EASE = [0.22, 1, 0.36, 1] as const;
+
+function Stage({
+  reduced,
+  enter,
+  exit,
+  className,
+  children,
+}: {
+  reduced: boolean;
+  enter: "fade" | "rise";
+  exit: "fade" | "through";
+  className?: string;
+  children: ReactNode;
+}) {
+  const fade = { duration: reduced ? 0.01 : 0.35, ease: STAGE_EASE };
+  const through = { duration: reduced ? 0.01 : 0.62, ease: STAGE_EASE };
+  const rise = { duration: reduced ? 0.01 : 0.72, ease: STAGE_EASE, delay: reduced ? 0 : 0.06 };
+  const node = useRef<HTMLDivElement>(null);
+  return (
+    <motion.div
+      ref={node}
+      onAnimationComplete={() => {
+        if (node.current) node.current.style.transform = "none";
+      }}
+      className={cn("absolute inset-0 overflow-hidden bg-background", className)}
+      initial={reduced ? { opacity: 0 } : enter === "rise" ? { opacity: 0, y: 32, scale: 0.972 } : { opacity: 0 }}
+      animate={reduced ? { opacity: 1, transition: fade } : { opacity: 1, y: 0, scale: 1, transition: enter === "rise" ? rise : fade }}
+      exit={
+        reduced
+          ? { opacity: 0, transition: fade }
+          : exit === "through"
+            ? { opacity: 0, scale: 1.035, transition: through }
+            : { opacity: 0, y: 10, transition: fade }
+      }
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
 }
 
 function Shell() {

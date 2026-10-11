@@ -182,6 +182,37 @@
   --shadow-color: 0 0% 0%;
 }
 
+/* The login handoff stays indigo while the workspace behind it is already gray. */
+.dark.workspace .signin-stage {
+  --background: oklch(0.16 0.012 265);
+  --foreground: oklch(0.95 0.008 85);
+  --surface: oklch(0.185 0.013 265);
+  --surface-raised: oklch(0.215 0.015 265);
+  --card: oklch(0.205 0.014 265);
+  --card-foreground: oklch(0.95 0.008 85);
+  --popover: oklch(0.215 0.015 265);
+  --popover-foreground: oklch(0.95 0.008 85);
+  --primary: oklch(0.72 0.16 270);
+  --primary-foreground: oklch(0.14 0.02 265);
+  --secondary: oklch(0.25 0.015 265);
+  --secondary-foreground: oklch(0.92 0.008 85);
+  --muted: oklch(0.25 0.015 265);
+  --muted-foreground: oklch(0.68 0.015 265);
+  --accent: oklch(0.3 0.04 268);
+  --accent-foreground: oklch(0.9 0.04 268);
+  --ring: oklch(0.72 0.16 270 / 60%);
+  --chart-1: oklch(0.72 0.16 270);
+  --chart-2: oklch(0.75 0.13 190);
+  --sidebar: oklch(0.14 0.012 265);
+  --sidebar-foreground: oklch(0.9 0.008 85);
+  --sidebar-primary: oklch(0.72 0.16 270);
+  --sidebar-primary-foreground: oklch(0.14 0.02 265);
+  --sidebar-accent: oklch(0.22 0.015 265);
+  --sidebar-accent-foreground: oklch(0.95 0.008 85);
+  --sidebar-ring: oklch(0.72 0.16 270 / 60%);
+  --shadow-color: 265 30% 2%;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
