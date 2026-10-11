@@ -14,7 +14,7 @@ module.exports = {
   },
   files: ["dist/**", "package.json"],
   extraResources: [
-    { from: "../server/dist", to: "server", filter: ["**/*.js", "**/*.map"] },
+    { from: "../server/dist", to: "server", filter: ["**/*.js", "**/*.mjs", "**/*.map", "package.json"] },
     { from: "../web/dist", to: "web" },
     { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c", "!nimbus-input", "!nimbus-input-*"] },
   ],

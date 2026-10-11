@@ -23,6 +23,7 @@ const VIRTUAL_IFACE = /^(docker|br-|veth|virbr|vmnet|vboxnet|utun|awdl|llw|bridg
 
 /** Private IPv4 a phone on the same Wi-Fi can open. Skips localhost and link-local. */
 export function isLanIPv4(ip: string): boolean {
+  if (typeof ip !== "string" || !ip) return false;
   const parts = ip.split(".");
   if (parts.length !== 4) return false;
   const nums = parts.map((part) => Number(part));
@@ -42,8 +43,14 @@ function lanRank(ip: string): number {
 
 /** Wi-Fi and Ethernet addresses, with home-network ranges ahead of bridge networks. */
 export function lanAddresses(): string[] {
+  let interfaces: ReturnType<typeof os.networkInterfaces>;
+  try {
+    interfaces = os.networkInterfaces();
+  } catch {
+    return [];
+  }
   const found: { address: string; rank: number }[] = [];
-  for (const [iface, addrs] of Object.entries(os.networkInterfaces())) {
+  for (const [iface, addrs] of Object.entries(interfaces ?? {})) {
     if (VIRTUAL_IFACE.test(iface)) continue;
     for (const a of addrs ?? []) {
       if (a.family === "IPv4" && !a.internal && isLanIPv4(a.address)) found.push({ address: a.address, rank: lanRank(a.address) });
@@ -84,7 +91,8 @@ function defaultRouteAddress(): string | null {
  * scanned QR code must open. A `.local` name is last: it is useful for a home-screen
  * icon, and it is a different site from the Wi-Fi address.
  */
-export function phoneHosts(): string[] {
+export function phoneHosts(cfg?: { lanBound?: boolean }): string[] {
+  if (cfg?.lanBound === false) return [];
   const ips = lanAddresses();
   const preferred = defaultRouteAddress();
   const ordered = preferred ? [preferred, ...ips.filter((ip) => ip !== preferred)] : ips;
@@ -95,8 +103,8 @@ export function phoneHosts(): string[] {
 }
 
 /** Address encoded in the pairing QR. Never localhost and never the `.local` name. */
-export function wifiHost(): string | null {
-  return phoneHosts().find((host) => isLanIPv4(host)) ?? null;
+export function wifiHost(cfg?: { lanBound?: boolean }): string | null {
+  return phoneHosts(cfg).find((host) => isLanIPv4(host)) ?? null;
 }
 
 const MIME: Record<string, string> = {
@@ -122,7 +130,7 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
   app.use("/api/*", cors());
 
   app.get("/api/health", (c) => {
-    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: phoneHosts().map((host) => uiOrigin(cfg, host)) };
+    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: phoneHosts(cfg).map((host) => uiOrigin(cfg, host)) };
     return c.json(info);
   });
 
@@ -145,10 +153,19 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
     const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
     const dev = token ? db.deviceByToken(token) : null;
     if (!dev) return c.json({ error: "unauthorized" }, 401);
-    const wifi = wifiHost();
-    if (!wifi) return c.json({ error: "This computer has no Wi‑Fi address. Join the same network as the phone, then generate a new code." }, 409);
+    const wifi = wifiHost(cfg);
+    if (!wifi) {
+      const error = cfg.lanBound === false
+        ? process.platform === "darwin"
+          ? "macOS has not allowed Nimbus onto the local network yet. In System Settings, open Privacy & Security → Local Network, allow Nimbus, then reopen the app and generate a new code."
+          : process.platform === "win32"
+            ? "Windows has not allowed Nimbus through the firewall yet. Allow it, then reopen the app and generate a new code."
+            : "This computer has not allowed Nimbus onto the local network yet. Allow local connections, then reopen the app and generate a new code."
+        : "This computer has no Wi‑Fi address. Join the same network as the phone, then generate a new code.";
+      return c.json({ error }, 409);
+    }
     const { code, expiresAt } = db.createPairing(dev.spaceId);
-    const hosts = phoneHosts();
+    const hosts = phoneHosts(cfg);
     const url = `${uiOrigin(cfg, wifi)}/#/pair/${code}`;
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#0b0b0f", light: "#ffffff" } });
     const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: hosts.map((host) => uiOrigin(cfg, host)) };

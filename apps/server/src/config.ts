@@ -35,6 +35,8 @@ export interface ServerConfig {
   webDevPort: number;
   defaultWorkspace: string;
   platformName: string;
+  /** False when the OS refused a non-loopback socket. Phone links stay off until it is allowed. */
+  lanBound: boolean;
 }
 
 export function loadConfig(): ServerConfig {
@@ -53,6 +55,7 @@ export function loadConfig(): ServerConfig {
     webDevPort: Number(process.env.NIMBUS_WEB_PORT ?? 47830),
     defaultWorkspace: process.env.NIMBUS_WORKSPACE ?? path.join(dataDir, "workspace"),
     platformName: process.env.NIMBUS_PLATFORM_NAME ?? "Nimbus Desktop",
+    lanBound: true,
   };
 }
 

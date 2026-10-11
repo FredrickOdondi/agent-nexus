@@ -51,6 +51,8 @@ pnpm desktop:dist:win
 
 The setup program is `apps/desktop/release/Nimbus Setup 0.1.0.exe`. It installs on 64-bit Windows and on Windows on ARM. The person runs that file and follows the installer.
 
+Replace the copy already on the other Mac with a newly built disk image. Pull these changes, run `pnpm desktop:dist` again, and install that image. If the app still cannot start, the dialog quotes the server's own error, and the same text is written to `~/Library/Application Support/Nimbus/server.log`.
+
 GitHub Actions can build both as well: the Desktop installers workflow, run by hand or by pushing a `v*` tag. Download `Nimbus-*.dmg` or `Nimbus Setup *.exe` from the workflow artifacts.
 
 The first public build should be signed. Add these repository secrets and the workflow will sign and, on Mac, notarize:

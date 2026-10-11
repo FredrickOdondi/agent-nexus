@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,8 +17,21 @@ let serverUrl = DEV_SERVER;
 app.setPath("userData", path.join(app.getPath("appData"), "Nimbus"));
 
 function serverEntry(): string {
-  if (app.isPackaged) return path.join(process.resourcesPath, "server", "index.js");
-  return path.resolve(here, "../../server/dist/index.js");
+  const base = app.isPackaged ? path.join(process.resourcesPath, "server") : path.resolve(here, "../../server/dist");
+  const esm = path.join(base, "index.mjs");
+  return existsSync(esm) ? esm : path.join(base, "index.js");
+}
+
+function serverLogPath(): string {
+  return path.join(app.getPath("userData"), "server.log");
+}
+
+function noteServerLog(text: string) {
+  try {
+    const file = serverLogPath();
+    mkdirSync(path.dirname(file), { recursive: true });
+    appendFileSync(file, text);
+  } catch { /* the dialog still carries the message */ }
 }
 
 function webDist(): string {
@@ -37,26 +50,60 @@ async function isNimbus(url: string): Promise<boolean> {
   }
 }
 
+function failureText(stderr: string, code: number | null, timedOut: boolean): string {
+  const detail = stderr.trim();
+  const tail = detail.length > 700 ? detail.slice(-700) : detail;
+  const blocked = /EPERM|EACCES|operation not permitted|EADDRNOTAVAIL/i.test(detail);
+  const headline = timedOut
+    ? "The local Nimbus server did not start in time."
+    : `Nimbus server exited before it was ready (code ${code ?? "unknown"}).`;
+  const hint = blocked
+    ? process.platform === "darwin"
+      ? "macOS may be blocking Nimbus from the local network. Allow it in System Settings → Privacy & Security → Local Network, then open the app again."
+      : process.platform === "win32"
+        ? "Windows may be blocking Nimbus in the firewall. Allow it, then open the app again."
+        : "The system may be blocking Nimbus from accepting local connections. Allow it, then open the app again."
+    : "";
+  return [headline, hint, tail, `Details were saved to ${serverLogPath()}`].filter(Boolean).join("\n\n");
+}
+
 function waitForReady(child: ChildProcess, timeoutMs: number): Promise<number> {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let stdout = "";
+    let stderr = "";
+    const finish = (error?: Error, port?: number) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve(port ?? 0);
+    };
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error("The local Nimbus server did not start in time."));
+      finish(new Error(failureText(stderr, null, true)));
     }, timeoutMs);
-    let buffered = "";
-    const onData = (chunk: Buffer) => {
-      buffered += chunk.toString();
-      const match = /NIMBUS_READY\s+(\d+)/.exec(buffered);
-      if (!match) return;
-      clearTimeout(timer);
-      resolve(Number(match[1]));
+    const consider = (buffer: string) => {
+      const match = /NIMBUS_READY\s+(\d+)/.exec(buffer);
+      if (match) finish(undefined, Number(match[1]));
     };
-    child.stdout?.on("data", onData);
-    child.stderr?.on("data", (buf: Buffer) => process.stderr.write(buf));
-    child.once("exit", (code) => {
-      clearTimeout(timer);
-      reject(new Error(`Nimbus server exited before it was ready (code ${code ?? "unknown"}).`));
+    child.stdout?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stdout += text;
+      if (stdout.length > 20_000) stdout = stdout.slice(-12_000);
+      noteServerLog(text);
+      consider(stdout);
     });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      if (stderr.length > 20_000) stderr = stderr.slice(-12_000);
+      noteServerLog(text);
+      process.stderr.write(text);
+      consider(stderr);
+    });
+    child.once("error", (error) => finish(error));
+    child.once("exit", (code) => finish(new Error(failureText(stderr, code, false))));
   });
 }
 
@@ -104,14 +151,17 @@ async function ensureServer(): Promise<{ url: string; owns: boolean }> {
   }
   const dist = webDist();
   const dataDir = path.join(app.getPath("userData"), "data");
+  mkdirSync(dataDir, { recursive: true });
   const port = app.isPackaged ? 47831 : await freePort(devMode ? 47832 : 47831);
   if (app.isPackaged && !(await portIsFree(port))) {
     throw new Error(`Port ${port} is already in use. Quit the other Nimbus window and open the app again. Sign-in stays on http://127.0.0.1:${port}.`);
   }
+  noteServerLog(`\n----- ${new Date().toISOString()} starting ${entry} port ${port} -----\n`);
   const child = spawn(
     process.execPath,
     [entry, `--port=${port}`, `--data-dir=${dataDir}`, ...(existsSync(dist) ? [`--web-dist=${dist}`] : [])],
     {
+      cwd: dataDir,
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NIMBUS_PLATFORM_NAME: "Nimbus Desktop", ...screenHelperEnv() },
       stdio: ["ignore", "pipe", "pipe"],
     },
