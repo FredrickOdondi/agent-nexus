@@ -41,6 +41,12 @@ pnpm desktop
 
 On Linux in a container, add Electron's `--no-sandbox` flag if the process cannot set up its sandbox.
 
+## Phone
+
+`localhost` on your phone is the phone itself, so it can never open the app running on your computer. Vercel can host a static site, but this chat server keeps a live WebSocket, a SQLite file, and runs commands on your machine, so it has to stay on the computer.
+
+Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Devices** and scan the QR code. The address looks like `http://192.168.x.x:47830`, not localhost. macOS may ask to allow incoming connections for Node the first time.
+
 ## Link a phone
 
 1. On the desktop, open **Settings → Devices** and choose **Generate**.

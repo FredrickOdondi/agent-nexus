@@ -8,6 +8,8 @@ export interface ServerConfig {
   dataDir: string;
   /** Directory of the built web client to serve (optional in dev). */
   webDist: string | null;
+  /** Port of the Vite dev server. Used for phone links while the UI is not served from here. */
+  webDevPort: number;
   defaultWorkspace: string;
   platformName: string;
 }
@@ -22,6 +24,7 @@ export function loadConfig(): ServerConfig {
     port: Number(argPort ?? process.env.NIMBUS_PORT ?? 47831),
     dataDir,
     webDist: argWeb ?? process.env.NIMBUS_WEB_DIST ?? null,
+    webDevPort: Number(process.env.NIMBUS_WEB_PORT ?? 47830),
     defaultWorkspace: process.env.NIMBUS_WORKSPACE ?? path.join(dataDir, "workspace"),
     platformName: process.env.NIMBUS_PLATFORM_NAME ?? "Nimbus Desktop",
   };

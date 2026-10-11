@@ -9,6 +9,12 @@ import type { Db } from "./db.js";
 import type { ServerConfig } from "./config.js";
 import type { SpaceService } from "./space.js";
 
+/** Origin a phone should open. In dev that is the Vite port; in production the server serves the UI itself. */
+export function uiOrigin(cfg: ServerConfig, host: string): string {
+  const port = cfg.webDist ? cfg.port : cfg.webDevPort;
+  return `http://${host}:${port}`;
+}
+
 export function lanAddresses(): string[] {
   const out: string[] = [];
   for (const [, addrs] of Object.entries(os.networkInterfaces())) {
@@ -36,7 +42,7 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
   app.use("/api/*", cors());
 
   app.get("/api/health", (c) => {
-    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: lanAddresses().map((ip) => `http://${ip}:${cfg.port}`) };
+    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: lanAddresses().map((ip) => uiOrigin(cfg, ip)) };
     return c.json(info);
   });
 
@@ -54,12 +60,12 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     const dev = token ? db.deviceByToken(token) : null;
     if (!dev) return c.json({ error: "unauthorized" }, 401);
     const { code, expiresAt } = db.createPairing(space.spaceId);
-    const hostHeader = c.req.header("host") ?? `localhost:${cfg.port}`;
+    const hostHeader = (c.req.header("host") ?? `localhost:${cfg.port}`).split(":")[0];
     const lan = lanAddresses()[0];
-    const base = lan ? `http://${lan}:${cfg.port}` : `http://${hostHeader}`;
+    const base = uiOrigin(cfg, lan ?? hostHeader);
     const url = `${base}/#/pair/${code}`;
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#0b0b0f", light: "#ffffff" } });
-    const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: lanAddresses().map((ip) => `http://${ip}:${cfg.port}`) };
+    const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: lanAddresses().map((ip) => uiOrigin(cfg, ip)) };
     return c.json(ticket);
   });
 
@@ -92,7 +98,10 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
       return new Response(new Uint8Array(data), { headers: { "Content-Type": MIME[ext] ?? "application/octet-stream", "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache" } });
     });
   } else {
-    app.get("/", (c) => c.text("Nimbus server is running. Start the web client with `pnpm dev:web` or build it to serve from here.\n"));
+    app.get("/", (c) => {
+      const host = (c.req.header("host") ?? "127.0.0.1").split(":")[0];
+      return c.redirect(uiOrigin(cfg, host) + "/");
+    });
   }
 
   return app;

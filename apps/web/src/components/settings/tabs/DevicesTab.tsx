@@ -45,7 +45,7 @@ export function DevicesTab() {
 
   return (
     <div>
-      <Section title="Link a phone or another computer" description="Like WhatsApp: scan the QR (or type the code) on the other device. Both must be on the same network, or expose this server via a tunnel.">
+      <Section title="Link a phone or another computer" description="The phone and this computer must be on the same Wi-Fi. localhost only works on this computer, so the phone uses the address below.">
         <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
           <div className="flex size-56 items-center justify-center rounded-2xl border bg-white p-3 elevation-1 dark:bg-white">
             <AnimatePresence mode="wait">
@@ -61,7 +61,7 @@ export function DevicesTab() {
           <div className="flex flex-col gap-3">
             <div>
               <p className="text-sm font-medium">1. Open Nimbus on the other device</p>
-              <p className="text-xs text-muted-foreground">On a phone, scan the QR with the camera — it opens the mobile app in the browser (add it to your home screen for an app-like experience). Or visit {ticket?.lanUrls[0] ? <span className="font-mono">{ticket.lanUrls[0]}</span> : "the LAN address shown on the server"} and enter the code.</p>
+              <p className="text-xs text-muted-foreground">Scan the QR with the phone camera, or type this address into the phone browser: {ticket?.lanUrls[0] ? <span className="font-mono">{ticket.lanUrls[0]}</span> : "generate a code to see it"}. Do not use localhost on the phone.</p>
             </div>
             <div>
               <p className="text-sm font-medium">2. Enter the 6-digit code</p>
