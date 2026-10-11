@@ -16,7 +16,11 @@ writeFileSync(path.join(screenDir, "nimbus-screen.ps1"), SCREEN_PS1);
 writeFileSync(path.join(screenDir, "nimbus-input.c"), INPUT_C);
 writeFileSync(path.join(buildDir, "icon.png"), appIcon(1024));
 
-if (process.platform === "darwin") {
+const requested = process.argv.slice(2);
+const host = process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux";
+const targets = requested.length ? requested : [host];
+
+if (targets.includes("mac")) {
   const source = path.join(screenDir, "nimbus-input.c");
   const out = path.join(screenDir, "nimbus-input");
   const flags = ["-O2", "-framework", "CoreGraphics", "-framework", "CoreFoundation", "-o", out, source];

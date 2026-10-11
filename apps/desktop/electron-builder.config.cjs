@@ -16,7 +16,7 @@ module.exports = {
   extraResources: [
     { from: "../server/dist", to: "server", filter: ["**/*.js", "**/*.map"] },
     { from: "../web/dist", to: "web" },
-    { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c"] },
+    { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c", "!nimbus-input", "!nimbus-input-*"] },
   ],
   mac: {
     category: "public.app-category.productivity",
@@ -29,6 +29,7 @@ module.exports = {
     extendInfo: {
       NSScreenCaptureUsageDescription: "Nimbus takes a screenshot so the agent can see this screen and click what you ask.",
     },
+    extraResources: [{ from: "resources/screen/nimbus-input", to: "screen/nimbus-input" }],
   },
   dmg: { title: "Nimbus" },
   win: {

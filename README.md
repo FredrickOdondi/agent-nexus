@@ -41,9 +41,17 @@ pnpm desktop
 
 ## Installers
 
-`pnpm desktop:dist` builds a Mac disk image or a Windows setup program for the computer you are on. The app includes the server and the web UI. It listens on `http://127.0.0.1:47831` and does not need Node installed.
+`pnpm desktop:dist` builds the installer for the computer you are on. On a Mac that is a disk image. On Windows that is a setup program. The app includes the server and the web UI. It listens on `http://127.0.0.1:47831` and does not need Node installed.
 
-Mac and Windows installers are produced on those systems (or in GitHub Actions: the Desktop installers workflow, run by hand or by pushing a `v*` tag). Download `Nimbus-*.dmg` or `Nimbus Setup *.exe` from the workflow artifacts.
+To build the Windows installer from a Mac, in the same folder:
+
+```bash
+pnpm desktop:dist:win
+```
+
+The setup program is `apps/desktop/release/Nimbus Setup 0.1.0.exe` (64-bit Windows) and `apps/desktop/release/Nimbus Setup 0.1.0-arm64.exe` (Windows on ARM). Send the first file to a normal Windows PC. The person runs it and follows the installer.
+
+GitHub Actions can build both as well: the Desktop installers workflow, run by hand or by pushing a `v*` tag. Download `Nimbus-*.dmg` or `Nimbus Setup *.exe` from the workflow artifacts.
 
 The first public build should be signed. Add these repository secrets and the workflow will sign and, on Mac, notarize:
 
