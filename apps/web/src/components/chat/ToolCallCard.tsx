@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
-  Brain,
   Check,
   ChevronRight,
   CircleAlert,
@@ -25,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import type { ToolCallPart, ToolDisplay } from "@nimbus/shared";
+import { NimbusMark } from "@/components/brand/NimbusMark";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -43,7 +43,6 @@ const ICONS: Record<string, typeof Terminal> = {
   todo_write: ListChecks,
   task: Bot,
   get_task_output: Bot,
-  memory: Brain,
   enter_plan_mode: Sparkles,
   exit_plan_mode: Sparkles,
   skill: Sparkles,
@@ -124,7 +123,7 @@ export function ToolCallCard({ part, defaultOpen = false }: { part: ToolCallPart
         aria-expanded={open}
       >
         <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Icon className="size-3.5" />
+          {part.name === "memory" ? <NimbusMark state="static" size={14} /> : <Icon className="size-3.5" />}
         </span>
         <span className="flex min-w-0 flex-1 items-baseline gap-2">
           <span className="shrink-0 font-medium">{part.title}</span>

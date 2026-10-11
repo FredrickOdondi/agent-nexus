@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Brain, Check, ChevronRight, CircleAlert, Copy, History, RefreshCw } from "lucide-react";
+import { Check, ChevronRight, CircleAlert, Copy, History, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { ApprovalRequest, Message, Part } from "@nimbus/shared";
 import { messageText } from "@nimbus/shared";
@@ -143,7 +143,7 @@ function Reasoning({ text, live, durationMs }: { text: string; live: boolean; du
   return (
     <div className="my-1.5">
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 rounded-md py-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
-        <Brain className={cn("size-3.5", live && "animate-pulse-soft text-primary")} />
+        <NimbusMark state={live ? "loading" : "static"} size={14} />
         <span className={cn(live && "shimmer-text")}>{live ? "Thinking…" : `Thought${durationMs ? ` for ${Math.max(1, Math.round(durationMs / 1000))}s` : ""}`}</span>
         <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
       </button>
