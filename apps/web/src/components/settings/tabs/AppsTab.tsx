@@ -112,8 +112,8 @@ export function AppsTab() {
   const filtered = needle
     ? list.filter((app) => app.name.toLowerCase().includes(needle) || app.slug.includes(needle) || app.blurb.toLowerCase().includes(needle) || (app.category ?? "").toLowerCase().includes(needle))
     : list;
-  const ready = filtered.filter((app) => app.connected || app.noAuth);
-  const available = filtered.filter((app) => !app.connected && !app.noAuth);
+  const connectedApps = filtered.filter((app) => app.connected);
+  const available = filtered.filter((app) => !app.connected);
   const groups = groupApps(available);
 
   return (
@@ -148,14 +148,24 @@ export function AppsTab() {
           </div>
           <Button variant="outline" size="icon" className="size-11 shrink-0 rounded-xl lg:size-9" onClick={() => void load()} disabled={loading} aria-label="Refresh apps"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></Button>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? `${filtered.length} of ${list.length} apps. Approve access in the browser, then come back.` : "Save a key to load every app and see which accounts are connected."}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? `${connectedApps.length} connected · ${available.length} not connected. A check means the account is linked.` : "Save a key to load every app and see which accounts are connected."}</p>
         {loading && list.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading apps…</div>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">Nothing matches “{query.trim()}”. Connect it by slug below.</p>
         ) : (
           <div className="space-y-5">
-            {ready.length > 0 && <AppGroup title="Ready" apps={ready} busy={busy} canConnect={source !== "none" && enabled} onConnect={connect} />}
+            {connectedApps.length > 0 ? (
+              <AppGroup title="Connected" apps={connectedApps} busy={busy} canConnect={source !== "none" && enabled} onConnect={connect} />
+            ) : !needle ? (
+              <div>
+                <p className="mb-2 px-1 text-[13px] font-medium text-muted-foreground">Connected</p>
+                <p className="rounded-xl border border-dashed px-3 py-3 text-sm text-muted-foreground">No apps connected yet.</p>
+              </div>
+            ) : null}
+            {groups.length > 0 && groups[0]?.title !== "Not connected" && (
+              <p className="px-1 text-sm font-medium">Not connected</p>
+            )}
             {groups.map((group) => (
               <AppGroup key={group.title} title={group.title} apps={group.apps} busy={busy} canConnect={source !== "none" && enabled} onConnect={connect} />
             ))}
@@ -181,23 +191,22 @@ function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string;
       <p className="mb-2 px-1 text-[13px] font-medium text-muted-foreground">{title}</p>
       <ul className="overflow-hidden rounded-2xl border bg-surface lg:grid lg:grid-cols-2 lg:gap-2 lg:overflow-visible lg:rounded-none lg:border-0 lg:bg-transparent">
         {apps.map((app) => {
-          const ready = app.connected || app.noAuth;
           const pending = busy === app.slug;
           return (
             <li key={app.slug} className="border-b last:border-b-0 lg:rounded-xl lg:border lg:bg-surface">
               <button
                 type="button"
-                disabled={pending || !canConnect}
+                disabled={pending || !canConnect || app.connected}
                 onClick={() => onConnect(app.slug)}
                 className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted disabled:active:bg-transparent"
               >
                 {app.logo ? <img src={app.logo} alt="" loading="lazy" className="size-10 shrink-0 rounded-xl bg-white object-contain p-1" /> : <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-semibold text-muted-foreground">{app.name.slice(0, 1)}</span>}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[16px] leading-tight font-medium">{app.name}</span>
-                  <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{ready ? (app.noAuth && !app.connected ? "No sign-in required" : "Connected") : app.blurb}</span>
+                  <span className="mt-0.5 block truncate text-[13px] text-muted-foreground">{app.connected ? "Connected" : app.noAuth ? "Not connected · no sign-in required" : app.blurb}</span>
                 </span>
                 <span className="flex w-[4.75rem] shrink-0 items-center justify-end">
-                  {pending ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : ready ? <Check className="size-5 text-success" /> : <span className="text-[15px] font-semibold whitespace-nowrap text-primary">Connect</span>}
+                  {pending ? <Loader2 className="size-4 animate-spin text-muted-foreground" /> : app.connected ? <Check className="size-5 text-success" aria-label="Connected" /> : <span className="text-[15px] font-semibold whitespace-nowrap text-primary">Connect</span>}
                 </span>
               </button>
             </li>
@@ -209,10 +218,11 @@ function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string;
 }
 
 function groupApps(apps: ComposioAppState[]): { title: string; apps: ComposioAppState[] }[] {
-  const hasCategories = apps.some((app) => app.category);
-  if (!hasCategories) return apps.length ? [{ title: "All apps", apps }] : [];
+  const ordered = [...apps].sort((a, b) => Number(a.noAuth) - Number(b.noAuth) || a.name.localeCompare(b.name));
+  const hasCategories = ordered.some((app) => app.category);
+  if (!hasCategories) return ordered.length ? [{ title: "Not connected", apps: ordered }] : [];
   const buckets = new Map<string, ComposioAppState[]>();
-  for (const app of apps) {
+  for (const app of ordered) {
     const title = app.category?.trim() || "Other";
     const list = buckets.get(title);
     if (list) list.push(app);
