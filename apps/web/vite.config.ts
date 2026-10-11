@@ -11,6 +11,9 @@ export default defineConfig({
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
   server: {
+    host: "0.0.0.0",
+    port: 47830,
+    strictPort: true,
     proxy: {
       "/api": { target: SERVER, changeOrigin: true },
       "/ws": { target: SERVER.replace(/^http/, "ws"), ws: true },
