@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Bot, ChevronLeft, ChevronRight, Cpu, Info, Palette, Plug, Smartphone } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, Cpu, Info, Palette, Plug, Smartphone, UserRound } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { AboutTab } from "./tabs/AboutTab";
+import { AccountTab } from "./tabs/AccountTab";
 import { AgentTab } from "./tabs/AgentTab";
 import { AppsTab } from "./tabs/AppsTab";
 import { AppearanceTab } from "./tabs/AppearanceTab";
@@ -11,6 +12,7 @@ import { DevicesTab } from "./tabs/DevicesTab";
 import { ModelTab } from "./tabs/ModelTab";
 
 const TABS = [
+  { id: "account", label: "Account", icon: UserRound },
   { id: "model", label: "Model", icon: Cpu },
   { id: "agent", label: "Agent & tools", icon: Bot },
   { id: "apps", label: "Apps", icon: Plug },
@@ -34,6 +36,7 @@ function useMediaQuery(query: string) {
 function SettingsPanel({ tab }: { tab: string }) {
   return (
     <>
+      {tab === "account" && <AccountTab />}
       {tab === "model" && <ModelTab />}
       {tab === "agent" && <AgentTab />}
       {tab === "apps" && <AppsTab />}

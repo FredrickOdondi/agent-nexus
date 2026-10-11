@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { promises as fs, existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -6,6 +7,7 @@ import { cors } from "hono/cors";
 import QRCode from "qrcode";
 import type { HealthInfo, PairingTicket, Platform } from "@nimbus/shared";
 import { composioConnect, composioStatus } from "./composio-host.js";
+import { verifySupabaseAccessToken, type SupabaseAccount } from "./supabase-auth.js";
 import type { Db } from "./db.js";
 import type { ServerConfig } from "./config.js";
 import type { SpaceService } from "./space.js";
@@ -47,6 +49,10 @@ function isLoopback(addr: string | undefined): boolean {
   return !!addr && /^(127\.|::1$|::ffff:127\.)/.test(addr);
 }
 
+async function googleUser(header: string | undefined): Promise<SupabaseAccount | null> {
+  return verifySupabaseAccessToken(header);
+}
+
 export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, primaryToken: string, startedAt: number) {
   const app = new Hono<{ Bindings: { remote?: string }; Variables: { remote?: string } }>();
   app.use("*", async (c, next) => {
@@ -61,9 +67,13 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
   });
 
   /** Loopback-only: hands the primary device token to the desktop shell / local browser. */
-  app.get("/api/bootstrap", (c) => {
+  app.get("/api/bootstrap", async (c) => {
     const remote = c.get("remote");
     if (!isLoopback(remote)) return c.json({ error: "bootstrap is only available from this machine" }, 403);
+    const user = await googleUser(c.req.header("x-supabase-token"));
+    if (!user) return c.json({ error: "Sign in with Google first" }, 401);
+    const conflict = db.claimAccount(space.spaceId, user);
+    if (conflict) return c.json({ error: conflict }, 403);
     const dev = db.deviceByToken(primaryToken);
     return c.json({ token: primaryToken, deviceId: dev?.id, spaceId: space.spaceId });
   });
@@ -110,14 +120,30 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     }
   });
 
+  /** Bind the signed-in Google account to a space that this device already belongs to. */
+  app.post("/api/account/claim", async (c) => {
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const user = await googleUser(c.req.header("x-supabase-token"));
+    if (!user) return c.json({ error: "Sign in with Google first" }, 401);
+    const conflict = db.claimAccount(dev.spaceId, user);
+    if (conflict) return c.json({ error: conflict }, 403);
+    return c.json({ email: user.email, name: user.name });
+  });
+
   /** Exchange a pairing code for a device token (called by the phone). */
   app.post("/api/pair/claim", async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { code?: string; deviceName?: string; platform?: Platform };
     const code = String(body.code ?? "").trim();
     if (!/^\d{6}$/.test(code)) return c.json({ error: "Enter the 6-digit code shown on your desktop" }, 400);
-    const spaceId = db.claimPairing(code);
+    const user = await googleUser(c.req.header("x-supabase-token"));
+    if (!user) return c.json({ error: "Sign in with Google first" }, 401);
+    const spaceId = db.findPairing(code);
     if (!spaceId) return c.json({ error: "That code is invalid or has expired. Generate a new one on the desktop." }, 400);
-    const token = (await import("node:crypto")).randomBytes(32).toString("hex");
+    const conflict = db.claimAccount(spaceId, user);
+    if (conflict) return c.json({ error: conflict }, 403);
+    if (!db.claimPairing(code)) return c.json({ error: "That code is invalid or has expired. Generate a new one on the desktop." }, 400);
+    const token = randomBytes(32).toString("hex");
     const device = db.createDevice(spaceId, (body.deviceName ?? "Mobile").slice(0, 60), body.platform ?? "mobile", token);
     space.deviceUpserted(device);
     return c.json({ token, deviceId: device.id, spaceId });

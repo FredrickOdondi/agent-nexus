@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { cache, getMeta, setMeta } from "./db";
 import { SyncClient, type ConnectionState } from "./client";
 import { defaultDeviceName } from "./platform";
+import { supabase } from "./supabase";
 
 export const TOKEN_KEY = "nimbus.token";
 export const DEVICE_NAME_KEY = "nimbus.deviceName";
@@ -193,6 +194,7 @@ export const useStore = create<State>((set, get) => ({
   async signOut() {
     client?.close();
     client = null;
+    await supabase.auth.signOut().catch(() => {});
     localStorage.removeItem(TOKEN_KEY);
     await Promise.all([cache.conversations.clear(), cache.messages.clear(), cache.meta.clear()]).catch(() => {});
     location.hash = "";

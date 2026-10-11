@@ -8,7 +8,10 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { LinkDevice } from "@/components/onboarding/LinkDevice";
+import { SignIn } from "@/components/onboarding/SignIn";
+import { useAuth } from "@/lib/auth";
 import { TOKEN_KEY, useStore } from "@/lib/store";
+import { supabaseAccessToken } from "@/lib/supabase";
 import { isElectron, isMac, isStandalonePwa } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
@@ -31,9 +34,13 @@ function readPairCode(): string | undefined {
 }
 
 export default function App() {
+  const { ready, session } = useAuth();
   const [linked, setLinked] = useState(() => Boolean(localStorage.getItem(TOKEN_KEY)));
   const [pairCode, setPairCode] = useState(readPairCode);
+  const [accountGate, setAccountGate] = useState<"checking" | "ok" | "mismatch">(() => (localStorage.getItem(TOKEN_KEY) ? "checking" : "ok"));
+  const [mismatch, setMismatch] = useState<string | null>(null);
   const init = useStore((s) => s.init);
+  const signOut = useStore((s) => s.signOut);
 
   useEffect(() => {
     const onHash = () => setPairCode(readPairCode());
@@ -42,16 +49,65 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (linked) void init();
-  }, [linked, init]);
+    if (!session || !localStorage.getItem(TOKEN_KEY)) {
+      setAccountGate("ok");
+      return;
+    }
+    let cancelled = false;
+    setAccountGate("checking");
+    (async () => {
+      try {
+        const access = await supabaseAccessToken();
+        const res = await fetch("/api/account/claim", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY) ?? ""}`, "x-supabase-token": access },
+        });
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        if (cancelled) return;
+        if (res.status === 403) {
+          setMismatch(body.error || "This Nimbus belongs to a different Google account.");
+          setAccountGate("mismatch");
+          return;
+        }
+        setAccountGate("ok");
+      } catch {
+        if (!cancelled) setAccountGate("ok");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session]);
+
+  useEffect(() => {
+    if (linked && accountGate === "ok") void init();
+  }, [linked, accountGate, init]);
 
   // A fresh QR scan while already linked re-links as a new device.
   const showLink = !linked || Boolean(pairCode);
 
+  let screen: "loading" | "signin" | "mismatch" | "link" | "app" = "app";
+  if (!ready || (session && linked && accountGate === "checking" && !pairCode)) screen = "loading";
+  else if (!session) screen = "signin";
+  else if (accountGate === "mismatch" && !pairCode) screen = "mismatch";
+  else if (showLink) screen = "link";
+
   return (
     <TooltipProvider delay={300}>
       <AnimatePresence mode="wait" initial={false}>
-        {showLink ? (
+        {screen === "loading" ? (
+          <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-dvh items-center justify-center bg-background text-sm text-muted-foreground">
+            Checking your account…
+          </motion.div>
+        ) : screen === "signin" ? (
+          <motion.div key="signin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }}>
+            <SignIn />
+          </motion.div>
+        ) : screen === "mismatch" ? (
+          <motion.div key="mismatch" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 text-center">
+            <h1 className="text-xl font-semibold tracking-tight">Different Google account</h1>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{mismatch}</p>
+            <button type="button" onClick={() => void signOut()} className="mt-6 h-12 rounded-xl bg-primary px-5 text-base font-medium text-primary-foreground">Sign out</button>
+          </motion.div>
+        ) : screen === "link" ? (
           <motion.div key="link" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, scale: 0.985 }} transition={{ duration: 0.25 }}>
             <LinkDevice
               initialCode={pairCode}

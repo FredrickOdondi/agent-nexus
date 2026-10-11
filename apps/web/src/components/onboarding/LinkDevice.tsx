@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { DEVICE_NAME_KEY, TOKEN_KEY } from "@/lib/store";
+import { DEVICE_NAME_KEY, TOKEN_KEY, useStore } from "@/lib/store";
+import { supabaseAccessToken } from "@/lib/supabase";
 import { defaultDeviceName, detectPlatform, isElectron } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,7 @@ interface Props {
   onLinked(): void;
 }
 
-type Phase = "probing" | "code" | "claiming" | "done";
+type Phase = "probing" | "code" | "claiming" | "blocked" | "done";
 
 /**
  * First-run screen. On the machine that runs the server (desktop app or a
@@ -28,6 +29,7 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
   const [digits, setDigits] = useState<string[]>(() => (initialCode ?? "").padEnd(6, " ").split("").map((d) => d.trim()));
   const [name, setName] = useState(() => localStorage.getItem(DEVICE_NAME_KEY) ?? defaultDeviceName());
   const [error, setError] = useState<string | null>(null);
+  const signOut = useStore((s) => s.signOut);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
@@ -45,14 +47,22 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/bootstrap", { headers: { accept: "application/json" } });
-        if (res.ok) {
-          const data = (await res.json()) as { token: string };
+        const access = await supabaseAccessToken();
+        const res = await fetch("/api/bootstrap", { headers: { accept: "application/json", "x-supabase-token": access } });
+        const data = (await res.json().catch(() => ({}))) as { token?: string; error?: string };
+        if (res.ok && data.token) {
           if (cancelled) return;
           localStorage.setItem(TOKEN_KEY, data.token);
           localStorage.setItem(DEVICE_NAME_KEY, name);
           setPhase("done");
           onLinked();
+          return;
+        }
+        if (res.status !== 403 || !/this machine/i.test(data.error ?? "")) {
+          if (!cancelled) {
+            setError(data.error || "Could not link this computer");
+            setPhase("blocked");
+          }
           return;
         }
       } catch {
@@ -68,9 +78,10 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
     setPhase("claiming");
     setError(null);
     try {
+      const access = await supabaseAccessToken();
       const res = await fetch("/api/pair/claim", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-supabase-token": access },
         body: JSON.stringify({ code, deviceName: name.trim() || defaultDeviceName(), platform: detectPlatform() }),
       });
       const data = (await res.json()) as { token?: string; error?: string };
@@ -128,7 +139,13 @@ export function LinkDevice({ initialCode, onLinked }: Props) {
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
-          {phase === "probing" || phase === "done" ? (
+          {phase === "blocked" ? (
+            <motion.div key="blocked" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
+              <h2 className="text-xl font-semibold tracking-tight">Couldn’t link this device</h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">{error}</p>
+              <Button variant="outline" className="h-12 w-full text-base" onClick={() => void signOut()}>Sign out</Button>
+            </motion.div>
+          ) : phase === "probing" || phase === "done" ? (
             <motion.div key="probing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-3 py-8 text-center">
               <Loader2 className="size-6 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">{isElectron ? "Starting your local agent…" : "Looking for a Nimbus server on this machine…"}</p>

@@ -23,7 +23,7 @@ pnpm install
 pnpm dev
 ```
 
-That builds the shared packages, starts the server on [http://127.0.0.1:47831](http://127.0.0.1:47831), and the web app on [http://127.0.0.1:47830](http://127.0.0.1:47830). Opening the web app on the same machine signs you in automatically.
+That builds the shared packages, starts the server on [http://127.0.0.1:47831](http://127.0.0.1:47831), and the web app on [http://127.0.0.1:47830](http://127.0.0.1:47830). Sign in with Google, then this computer links itself. A phone on the same Wi-Fi signs in with the same Google account and enters the pairing code.
 
 Desktop window (with `pnpm dev` already running):
 
@@ -47,10 +47,22 @@ On Linux in a container, add Electron's `--no-sandbox` flag if the process canno
 
 Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Devices** and scan the QR code. Prefer the address ending in `.local` (for example `http://your-mac.local:47830`). A raw `192.168` address also works, but a home-screen icon saved from it opens inside the browser. macOS may ask to allow incoming connections for Node the first time.
 
+## Sign in
+
+Nimbus asks for Google through Supabase before it links a device. Use the same Google account on every device. **Settings → Account** shows who is signed in, and signing out only disconnects that device — chats stay on the computer.
+
+The Supabase project already has Google enabled. If Google sends you back to the wrong page, open the project’s Authentication → URL configuration and allow:
+
+- `http://127.0.0.1:47830/**`
+- `http://localhost:47830/**`
+- `http://*.local:47830/**`
+
+The Google Cloud client’s redirect URI stays `https://<project-ref>.supabase.co/auth/v1/callback`.
+
 ## Link a phone
 
-1. On the desktop, open **Settings → Devices** and choose **Generate**.
-2. On the phone (same Wi-Fi), scan the QR code or open the LAN address and type the 6-digit code.
+1. On the desktop, sign in with Google, then open **Settings → Devices** and choose **Generate**.
+2. On the phone (same Wi-Fi), open the address, sign in with the same Google account, and scan the QR code or type the 6-digit code.
 3. Chats, settings, and agent runs sync both ways. Each device has its own token; revoking a device in Settings disconnects it.
 
 On a phone, Nimbus opens to the chat list. Tap a chat to open it full screen; Chats, or the system back button, returns to the list. Add the page to your home screen for an icon with no browser bar. The UI is the same code as the desktop — there is no separate mobile codebase.

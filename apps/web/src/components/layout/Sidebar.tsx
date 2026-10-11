@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useAuth } from "@/lib/auth";
+import { accountFromSession } from "@/lib/supabase";
 import { useStore } from "@/lib/store";
 import { isElectron, isMac } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,7 @@ export function Sidebar({ onNavigate, variant = "sidebar" }: { onNavigate?: () =
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
   const approvals = useStore((s) => s.approvals);
+  const account = accountFromSession(useAuth().session);
   const onlineDevices = devices.filter((d) => d.online).length;
   const inbox = variant === "inbox";
   const statusLabel = connection === "online" ? `${onlineDevices} online` : connection === "connecting" ? "Connecting…" : "Offline";
@@ -106,6 +109,12 @@ export function Sidebar({ onNavigate, variant = "sidebar" }: { onNavigate?: () =
       </nav>
 
       <div className={cn("border-t border-sidebar-border p-2", inbox && "safe-bottom bg-background px-3")}>
+        {account && (
+          <button type="button" onClick={() => openSettings("account")} className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-sidebar-accent active:bg-sidebar-accent", inbox && "min-h-12 rounded-xl")}>
+            {account.avatar ? <img src={account.avatar} alt="" className="size-7 shrink-0 rounded-full object-cover" /> : <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{account.name.slice(0, 1).toUpperCase()}</span>}
+            <span className="min-w-0 flex-1"><span className="block truncate font-medium">{account.name}</span><span className="block truncate text-xs text-muted-foreground">{account.email || "Google account"}</span></span>
+          </button>
+        )}
         <button type="button" onClick={() => openSettings("devices")} className={cn("flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm transition-colors hover:bg-sidebar-accent active:bg-sidebar-accent", inbox && "min-h-12 rounded-xl")}>
           <span className="relative flex size-7 items-center justify-center rounded-lg bg-sidebar-accent text-muted-foreground"><Smartphone className="size-4" />{onlineDevices > 1 && <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-success ring-2 ring-sidebar" />}</span>
           <span className="min-w-0 flex-1"><span className="block truncate font-medium">Linked devices</span><span className="block truncate text-xs text-muted-foreground">{devices.length} device{devices.length === 1 ? "" : "s"} · {onlineDevices} online</span></span>

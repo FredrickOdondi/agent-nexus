@@ -50,6 +50,9 @@ export class Db {
       CREATE INDEX IF NOT EXISTS events_space ON events(space_id, seq);
       CREATE TABLE IF NOT EXISTS settings (space_id TEXT PRIMARY KEY, json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS pairings (code TEXT PRIMARY KEY, space_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS accounts (
+        space_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, email TEXT, name TEXT, avatar TEXT
+      );
       CREATE TABLE IF NOT EXISTS todos (conversation_id TEXT PRIMARY KEY, json TEXT NOT NULL);
     `);
   }
@@ -125,12 +128,34 @@ export class Db {
     return { code, expiresAt };
   }
 
+  findPairing(code: string): string | null {
+    const r = this.db.prepare("SELECT space_id, expires_at FROM pairings WHERE code = ?").get(code) as { space_id: string; expires_at: number } | undefined;
+    if (!r || r.expires_at < Date.now()) return null;
+    return r.space_id;
+  }
+
   claimPairing(code: string): string | null {
     const r = this.db.prepare("SELECT space_id, expires_at FROM pairings WHERE code = ?").get(code) as { space_id: string; expires_at: number } | undefined;
     if (!r) return null;
     this.db.prepare("DELETE FROM pairings WHERE code = ?").run(code);
     if (r.expires_at < Date.now()) return null;
     return r.space_id;
+  }
+
+  /**
+   * Attach this Google user to the space. The first account wins.
+   * Returns an error message when a different account already owns it.
+   */
+  claimAccount(spaceId: string, user: { id: string; email: string | null; name: string | null; avatar: string | null }): string | null {
+    const existing = this.db.prepare("SELECT user_id, email FROM accounts WHERE space_id = ?").get(spaceId) as { user_id: string; email: string | null } | undefined;
+    if (existing && existing.user_id !== user.id) {
+      const who = existing.email?.trim() || "another Google account";
+      return `This Nimbus is signed in as ${who}. Use that account.`;
+    }
+    this.db.prepare(
+      "INSERT INTO accounts (space_id, user_id, email, name, avatar) VALUES (?, ?, ?, ?, ?) ON CONFLICT(space_id) DO UPDATE SET email = excluded.email, name = excluded.name, avatar = excluded.avatar",
+    ).run(spaceId, user.id, user.email, user.name, user.avatar);
+    return null;
   }
 
   // ---- settings -----------------------------------------------------------
