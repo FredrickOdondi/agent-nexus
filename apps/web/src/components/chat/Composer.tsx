@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { AgentMode } from "@nimbus/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useConversation, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 
@@ -148,7 +149,7 @@ export function Composer() {
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <span className="ml-1 hidden text-[11px] text-muted-foreground sm:inline">{offline ? "Offline — reconnecting…" : "Enter to send · Shift+Enter for a new line · / for commands"}</span>
+          {offline && <span className="ml-1 text-[11px] text-muted-foreground">Offline — reconnecting…</span>}
           <div className="ml-auto">
             <AnimatePresence mode="wait" initial={false}>
               {running ? (
@@ -157,7 +158,12 @@ export function Composer() {
                 </motion.div>
               ) : (
                 <motion.div key="send" initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }} transition={{ type: "spring", stiffness: 500, damping: 30 }}>
-                  <Button onClick={() => void submit()} size="icon" className="rounded-full max-lg:size-11" disabled={!value.trim() || busy || offline} aria-label="Send"><ArrowUp /></Button>
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="inline-flex" />}>
+                      <Button onClick={() => void submit()} size="icon" className="rounded-full max-lg:size-11" disabled={!value.trim() || busy || offline} aria-label="Send"><ArrowUp /></Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Enter to send. Shift+Enter for a new line. Type / for commands.</TooltipContent>
+                  </Tooltip>
                 </motion.div>
               )}
             </AnimatePresence>

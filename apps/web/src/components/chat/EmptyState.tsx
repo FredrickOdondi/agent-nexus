@@ -1,16 +1,15 @@
 import { motion } from "motion/react";
 import { NimbusMark } from "@/components/brand/NimbusMark";
 import { cn } from "@/lib/utils";
-import { Code2, Globe, ListTodo, Sparkles, Terminal, Wand2 } from "lucide-react";
 import { useStore } from "@/lib/store";
 
 const SUGGESTIONS = [
-  { icon: Code2, title: "Explore the codebase", prompt: "Explore the codebase and summarise the architecture, key modules and how they fit together." },
-  { icon: Globe, title: "Research with sources", prompt: "Search the web for the latest TypeScript release and summarise what changed, with sources." },
-  { icon: Terminal, title: "Run and fix", prompt: "Run the test suite, read any failures, fix them and re-run until green." },
-  { icon: ListTodo, title: "Plan a migration", prompt: "Plan a migration of this app from Next.js to Vite + a lightweight Node server. Break it into concrete steps." },
-  { icon: Wand2, title: "Generate an image", prompt: "Generate an image of a minimalist app icon: a soft cloud with an electric indigo spark, flat design." },
-  { icon: Sparkles, title: "Ask me to decide", prompt: "Should I use SQLite or Postgres for a local-first desktop app? Ask me about my constraints first." },
+  { title: "Explore the codebase", prompt: "Explore the codebase and summarise the architecture, key modules and how they fit together." },
+  { title: "Research with sources", prompt: "Search the web for the latest TypeScript release and summarise what changed, with sources." },
+  { title: "Run and fix", prompt: "Run the test suite, read any failures, fix them and re-run until green." },
+  { title: "Plan a migration", prompt: "Plan a migration of this app from Next.js to Vite + a lightweight Node server. Break it into concrete steps." },
+  { title: "Generate an image", prompt: "Generate an image of a minimalist app icon: a soft cloud with an electric indigo spark, flat design." },
+  { title: "Ask me to decide", prompt: "Should I use SQLite or Postgres for a local-first desktop app? Ask me about my constraints first." },
 ];
 
 export function EmptyState() {
@@ -22,8 +21,8 @@ export function EmptyState() {
   return (
     <div className="relative mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-start px-4 py-6 sm:justify-center sm:px-6 sm:py-10">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <motion.div className="absolute top-[12%] left-[18%] size-72 rounded-full bg-primary/15 blur-3xl" animate={{ x: [0, 30, 0], y: [0, -20, 0] }} transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }} />
-        <motion.div className="absolute right-[12%] bottom-[18%] size-80 rounded-full bg-chart-2/15 blur-3xl" animate={{ x: [0, -24, 0], y: [0, 26, 0] }} transition={{ duration: 17, repeat: Infinity, ease: "easeInOut" }} />
+        <div className="absolute inset-x-0 top-0 h-[28rem] bg-[radial-gradient(ellipse_at_50%_-10%,var(--primary),transparent_58%)] opacity-[0.14]" />
+        <div className="absolute inset-x-[8%] top-8 h-72 bg-[radial-gradient(ellipse_at_72%_0%,var(--chart-2),transparent_62%)] opacity-[0.18]" />
       </div>
 
       <motion.div initial={{ opacity: 0, y: 14, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} className="mb-6">
@@ -33,7 +32,7 @@ export function EmptyState() {
         What should we build today?
       </motion.h1>
       <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, type: "spring", stiffness: 260, damping: 26 }} className="mt-2 max-w-md text-center text-sm text-muted-foreground">
-        Nimbus reads and edits files, runs commands, searches the web, spawns subagents and remembers across sessions — synced live to every linked device.
+        Your chats stay on this computer and sync to every linked phone.
       </motion.p>
 
       {demo && (
@@ -50,12 +49,12 @@ export function EmptyState() {
       )}
 
       <motion.div
-        className="mt-8 grid w-full gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        className="-mx-4 mt-8 flex w-[calc(100%+2rem)] snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:w-full sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden"
         initial="hidden"
         animate="show"
         variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05, delayChildren: 0.15 } } }}
       >
-        {SUGGESTIONS.map((s, i) => (
+        {SUGGESTIONS.map((s) => (
           <motion.button
             key={s.title}
             type="button"
@@ -63,10 +62,10 @@ export function EmptyState() {
             whileHover={{ y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => void sendMessage(s.prompt)}
-            className={cn("group flex min-h-14 items-start gap-3 rounded-2xl border bg-surface-raised p-3.5 text-left elevation-1 transition-colors hover:border-primary/40 hover:bg-accent/40 active:scale-[0.99]", i > 2 && "max-lg:hidden")}
+            className={cn("group flex w-[min(78vw,240px)] shrink-0 snap-start items-center gap-3 rounded-2xl border bg-surface-raised p-3.5 text-left elevation-1 transition-colors hover:border-primary/40 hover:bg-accent/40 active:scale-[0.99] sm:w-auto")}
           >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary"><s.icon className="size-4" /></span>
-            <span className="min-w-0"><span className="block text-sm font-medium">{s.title}</span><span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{s.prompt}</span></span>
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10"><NimbusMark state="static" size={22} /></span>
+            <span className="text-sm font-medium">{s.title}</span>
           </motion.button>
         ))}
       </motion.div>
