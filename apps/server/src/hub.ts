@@ -231,7 +231,7 @@ export class Hub {
         return ack();
 
       case "approval.respond":
-        if (!this.runs.respondApproval(msg.requestId, msg.decision)) throw new Error("Approval request no longer pending");
+        if (!this.runs.respondApproval(msg.approvalId, msg.decision)) throw new Error("Approval request no longer pending");
         return ack();
 
       case "question.answer":

@@ -115,6 +115,7 @@ export class SyncClient {
         reject(new Error("The server didn't respond in time."));
       }, timeoutMs);
       this.pending.set(requestId, { resolve: resolve as (v: unknown) => void, reject, timer });
+      // Spread the command first so this ack id is never replaced by a field inside the command.
       this.ws.send(JSON.stringify({ ...cmd, requestId }));
     });
   }

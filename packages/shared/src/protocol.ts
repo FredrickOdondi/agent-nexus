@@ -61,7 +61,7 @@ export type ClientCommand =
   | { type: "conversation.delete"; conversationId: string }
   | { type: "conversation.create"; title?: string; mode?: Conversation["mode"]; workspacePath?: string | null }
   | { type: "messages.fetch"; conversationId: string }
-  | { type: "approval.respond"; requestId: string; decision: "allow" | "allow_always" | "deny" }
+  | { type: "approval.respond"; approvalId: string; decision: "allow" | "allow_always" | "deny" }
   | { type: "question.answer"; conversationId: string; messageId: string; questionId: string; answer: string }
   | { type: "settings.update"; patch: Partial<SpaceSettings> & { provider?: Partial<SpaceSettings["provider"]> } }
   | { type: "device.rename"; deviceId: string; name: string }
@@ -69,6 +69,7 @@ export type ClientCommand =
   | { type: "rewind"; conversationId: string; messageId: string }
   | { type: "ping" };
 
+/** Envelope around a command. `requestId` correlates the ack and must not carry a domain id. */
 export type ClientMessage = ClientCommand & { requestId?: string };
 
 export const PROTOCOL_VERSION = 1;

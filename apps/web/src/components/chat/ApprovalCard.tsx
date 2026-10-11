@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ShieldCheck, ShieldX } from "lucide-react";
 import { toast } from "sonner";
@@ -13,16 +13,27 @@ import { useStore } from "@/lib/store";
 export function ApprovalCard({ request }: { request: ApprovalRequest }) {
   const send = useStore((s) => s.send);
   const [busy, setBusy] = useState<string | null>(null);
+  const [hidden, setHidden] = useState(false);
+  const sent = useRef(false);
   const decide = async (decision: "allow" | "allow_always" | "deny") => {
+    if (sent.current) return;
+    sent.current = true;
     setBusy(decision);
     try {
-      await send({ type: "approval.respond", requestId: request.id, decision });
+      await send({ type: "approval.respond", approvalId: request.id, decision });
     } catch (e) {
-      toast.error((e as Error).message);
+      const message = (e as Error).message;
+      if (message === "Approval request no longer pending") {
+        setHidden(true);
+        return;
+      }
+      sent.current = false;
+      toast.error(message);
     } finally {
       setBusy(null);
     }
   };
+  if (hidden) return null;
   const argsPreview = JSON.stringify(request.args, null, 2);
   return (
     <motion.div
