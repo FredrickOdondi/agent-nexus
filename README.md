@@ -51,12 +51,16 @@ Put the phone on the same Wi-Fi, run `pnpm dev`, then open **Settings → Device
 
 Nimbus asks for Google through Supabase before it links a device. Each Google account has its own chats, settings, and devices on this computer. User A cannot open user B’s activity. Use the same Google account on the phone that you used on the computer that showed the pairing code. **Settings → Account** shows who is signed in. Signing out disconnects this browser; the chats stay on the computer for that account.
 
-The Supabase project already has Google enabled. Its Site URL is still the factory default `http://localhost:3000`. After Google, Supabase only returns to an address on the allow list. A phone address that is missing from that list is sent to `localhost:3000`, which on the phone is the phone itself. Open Authentication → URL configuration, set the Site URL to `http://127.0.0.1:47830`, and allow:
+The Supabase project already has Google enabled. After Google, Supabase returns to the phone only when that phone’s address is in **Redirect URLs**. Otherwise it sends the browser to the Site URL. `http://127.0.0.1:47830` is the computer, so on the phone that address cannot connect. Open Authentication → URL configuration and allow:
 
 - `http://127.0.0.1:47830/**`
 - `http://localhost:47830/**`
 - `http://*.local:47830/**`
-- `http://**:47830/**`
+- `http://192.168.*.*:47830/**`
+- `http://10.*.*.*:47830/**`
+- `http://172.*.*.*:47830/**`
+
+The Site URL can stay `http://127.0.0.1:47830` for this computer. The phone uses the Wi‑Fi patterns above.
 
 The Google Cloud client’s redirect URI stays `https://<project-ref>.supabase.co/auth/v1/callback`.
 

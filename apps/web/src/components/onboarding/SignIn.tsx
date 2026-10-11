@@ -64,7 +64,7 @@ export function SignIn() {
 
         {onPhone && (
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-            Google must return to <span className="font-mono break-all text-foreground">{location.origin}/</span>. If this phone opens localhost:3000, that is Supabase’s default Site URL. In the project’s Authentication → URL configuration, change Site URL to <span className="font-mono">http://127.0.0.1:47830</span> and add <span className="font-mono break-all">{location.origin}/**</span> and <span className="font-mono">http://**:47830/**</span> under Redirect URLs.
+            Google must return to <span className="font-mono break-all text-foreground">{location.origin}/</span>. If it opens 127.0.0.1, the phone is trying to reach itself and the page will not load. In Supabase, open Authentication → URL configuration and add <span className="font-mono break-all">{location.origin}/**</span> under Redirect URLs, then sign in again from this page.
           </p>
         )}
 
