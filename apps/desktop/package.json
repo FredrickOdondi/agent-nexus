@@ -4,16 +4,19 @@
   "private": true,
   "type": "module",
   "description": "Nimbus desktop shell. A thin Electron window around the local server and web client.",
+  "author": "Nimbus",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json && cp preload.cjs dist/preload.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "pnpm run build && electron . --dev",
-    "start": "pnpm run build && electron ."
+    "start": "pnpm run build && electron .",
+    "dist": "pnpm run build && node scripts/stage-resources.mjs && electron-builder --config electron-builder.config.cjs --publish never"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
-    "electron": "^33.4.11",
+    "electron": "44.7.0",
+    "electron-builder": "^26.0.12",
     "typescript": "^5.9.3"
   }
 }

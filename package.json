@@ -16,6 +16,7 @@
     "dev:desktop": "pnpm --filter @nimbus/desktop run dev",
     "start": "pnpm --filter @nimbus/server run start",
     "desktop": "pnpm --filter @nimbus/desktop run start",
+    "desktop:dist": "pnpm --filter @nimbus/agent-core build && pnpm --filter @nimbus/server build && pnpm --filter @nimbus/web build && pnpm --filter @nimbus/desktop run dist",
     "typecheck": "pnpm -r run typecheck",
     "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist"
   }

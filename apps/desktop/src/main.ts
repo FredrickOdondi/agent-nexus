@@ -60,6 +60,26 @@ function waitForReady(child: ChildProcess, timeoutMs: number): Promise<number> {
   });
 }
 
+function portIsFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.createServer();
+    socket.once("error", () => resolve(false));
+    socket.listen(port, "127.0.0.1", () => socket.close(() => resolve(true)));
+  });
+}
+
+/** Helpers shipped beside the app. Dev builds compile or write these on demand. */
+function screenHelperEnv(): Record<string, string> {
+  if (!app.isPackaged) return {};
+  const dir = path.join(process.resourcesPath, "screen");
+  const helper = path.join(dir, "nimbus-input");
+  const ps1 = path.join(dir, "nimbus-screen.ps1");
+  return {
+    ...(existsSync(helper) ? { NIMBUS_INPUT_BIN: helper } : {}),
+    ...(existsSync(ps1) ? { NIMBUS_SCREEN_PS1: ps1 } : {}),
+  };
+}
+
 function freePort(preferred: number, attempts = 20): Promise<number> {
   return new Promise((resolve, reject) => {
     if (attempts <= 0) { reject(new Error("No free port for the local server.")); return; }
@@ -84,12 +104,15 @@ async function ensureServer(): Promise<{ url: string; owns: boolean }> {
   }
   const dist = webDist();
   const dataDir = path.join(app.getPath("userData"), "data");
-  const port = await freePort(devMode ? 47832 : 47831);
+  const port = app.isPackaged ? 47831 : await freePort(devMode ? 47832 : 47831);
+  if (app.isPackaged && !(await portIsFree(port))) {
+    throw new Error(`Port ${port} is already in use. Quit the other Nimbus window and open the app again. Sign-in stays on http://127.0.0.1:${port}.`);
+  }
   const child = spawn(
     process.execPath,
     [entry, `--port=${port}`, `--data-dir=${dataDir}`, ...(existsSync(dist) ? [`--web-dist=${dist}`] : [])],
     {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NIMBUS_PLATFORM_NAME: "Nimbus Desktop" },
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", NIMBUS_PLATFORM_NAME: "Nimbus Desktop", ...screenHelperEnv() },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );

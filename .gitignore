@@ -14,3 +14,6 @@ terminals/
 .pnpm-store/
 .playwright-mcp/
 apps/web/dist/
+apps/desktop/release/
+apps/desktop/resources/
+apps/desktop/build/icon.png

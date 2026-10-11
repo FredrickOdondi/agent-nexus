@@ -39,6 +39,28 @@ pnpm --filter @nimbus/web build
 pnpm desktop
 ```
 
+## Installers
+
+`pnpm desktop:dist` builds a Mac disk image or a Windows setup program for the computer you are on. The app includes the server and the web UI. It listens on `http://127.0.0.1:47831` and does not need Node installed.
+
+Mac and Windows installers are produced on those systems (or in GitHub Actions: the Desktop installers workflow, run by hand or by pushing a `v*` tag). Download `Nimbus-*.dmg` or `Nimbus Setup *.exe` from the workflow artifacts.
+
+The first public build should be signed. Add these repository secrets and the workflow will sign and, on Mac, notarize:
+
+| Secret | Used for |
+| --- | --- |
+| `CSC_LINK` | Base64 Apple Developer ID `.p12` |
+| `CSC_KEY_PASSWORD` | Password for that `.p12` |
+| `APPLE_ID` | Apple ID that can notarize |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization |
+| `APPLE_TEAM_ID` | Apple team id |
+| `WIN_CSC_LINK` | Base64 Windows Authenticode `.pfx` |
+| `WIN_CSC_KEY_PASSWORD` | Password for that `.pfx` |
+
+Without those secrets the workflow still uploads an installer. macOS Gatekeeper will ask the person to right-click the app and choose Open the first time, and Windows SmartScreen will warn. Screen Recording and Accessibility on a Mac stick to the app only after it is signed with a Developer ID.
+
+On a Mac, the build compiles a universal click helper with `swiftc` and puts it inside the app, so people do not need Xcode. The first screenshot asks for Screen Recording. The first click asks for Accessibility.
+
 On Linux in a container, add Electron's `--no-sandbox` flag if the process cannot set up its sandbox.
 
 ## Phone
@@ -54,7 +76,9 @@ Nimbus asks for Google through Supabase before it links a device. Each Google ac
 The Supabase project already has Google enabled. After Google, Supabase returns to the phone only when that phone’s address is in **Redirect URLs**. Otherwise it sends the browser to the Site URL. `http://127.0.0.1:47830` is the computer, so on the phone that address cannot connect. Open Authentication → URL configuration and allow:
 
 - `http://127.0.0.1:47830/**`
+- `http://127.0.0.1:47831/**`
 - `http://localhost:47830/**`
+- `http://localhost:47831/**`
 - `http://*.local:47830/**`
 - `http://192.168.*.*:47830/**`
 - `http://10.*.*.*:47830/**`

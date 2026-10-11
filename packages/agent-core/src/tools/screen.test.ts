@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { INPUT_SWIFT, SCREEN_PS1 } from "./screen.js";
 import {
   escapeSendKeysText,
   imageSize,
@@ -11,6 +12,11 @@ import {
   toSendKeys,
   toXdotoolKey,
 } from "./screen-geom.js";
+
+test("installer helpers contain the screen commands", () => {
+  assert.match(SCREEN_PS1, /ValidateSet\("shot","click"/);
+  assert.match(INPUT_SWIFT, /case "click"/);
+});
 
 test("png size is read from the IHDR chunk", () => {
   const buf = Buffer.alloc(24);

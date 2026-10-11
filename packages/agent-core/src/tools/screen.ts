@@ -222,7 +222,7 @@ async function shrinkLinux(png: string, jpg: string): Promise<boolean> {
   return false;
 }
 
-const PS1 = String.raw`
+export const SCREEN_PS1 = String.raw`
 param(
   [Parameter(Mandatory=$true)][ValidateSet("shot","click","move","drag","scroll","type","key")][string]$Verb,
   [int]$X = 0,
@@ -305,14 +305,21 @@ switch ($Verb) {
 `;
 
 async function ps1Path(dataDir: string): Promise<string> {
+  const bundled = process.env.NIMBUS_SCREEN_PS1;
+  if (bundled) {
+    try {
+      await fs.access(bundled);
+      return bundled;
+    } catch { /* the packaged script is missing; write a copy */ }
+  }
   const dir = path.join(dataDir, "bin");
   await fs.mkdir(dir, { recursive: true });
   const file = path.join(dir, "nimbus-screen.ps1");
-  const hash = createHash("sha256").update(PS1).digest("hex").slice(0, 12);
+  const hash = createHash("sha256").update(SCREEN_PS1).digest("hex").slice(0, 12);
   const stamp = path.join(dir, "nimbus-screen.ps1.sha");
   const prev = await fs.readFile(stamp, "utf8").catch(() => "");
   if (prev !== hash) {
-    await fs.writeFile(file, PS1, "utf8");
+    await fs.writeFile(file, SCREEN_PS1, "utf8");
     await fs.writeFile(stamp, hash, "utf8");
   }
   return file;
@@ -338,7 +345,7 @@ async function shotWindows(dataDir: string): Promise<Shot> {
   }
 }
 
-const SWIFT = String.raw`
+export const INPUT_SWIFT = String.raw`
 import Foundation
 import CoreGraphics
 
@@ -401,13 +408,21 @@ let macHelper: string | null | undefined;
 
 async function macInputBin(dataDir: string): Promise<string | null> {
   if (macHelper !== undefined) return macHelper;
+  const bundled = process.env.NIMBUS_INPUT_BIN;
+  if (bundled) {
+    try {
+      await fs.access(bundled, constants.X_OK);
+      macHelper = bundled;
+      return bundled;
+    } catch { /* fall through to a local compile */ }
+  }
   if (!(await commandExists("swiftc"))) {
     macHelper = null;
     return null;
   }
   const dir = path.join(dataDir, "bin");
   await fs.mkdir(dir, { recursive: true });
-  const hash = createHash("sha256").update(SWIFT).digest("hex").slice(0, 12);
+  const hash = createHash("sha256").update(INPUT_SWIFT).digest("hex").slice(0, 12);
   const bin = path.join(dir, `nimbus-input-${hash}`);
   try {
     await fs.access(bin, constants.X_OK);
@@ -415,7 +430,7 @@ async function macInputBin(dataDir: string): Promise<string | null> {
     return bin;
   } catch { /* compile */ }
   const src = path.join(dir, `nimbus-input-${hash}.swift`);
-  await fs.writeFile(src, SWIFT, "utf8");
+  await fs.writeFile(src, INPUT_SWIFT, "utf8");
   try {
     await run("swiftc", ["-O", "-o", bin, src], 90_000);
     macHelper = bin;
@@ -466,7 +481,7 @@ async function inputMac(dataDir: string, args: string[]) {
     await osascriptClick(Number(args[1]), Number(args[2]), Number(args[4] ?? 1));
     return;
   }
-  throw new ScreenError("This click needs the Swift compiler (xcode-select --install) so Nimbus can move the pointer. Left click still works without it.");
+  throw new ScreenError("This click needs the Nimbus input helper. Install the signed Mac app, or on a dev machine run xcode-select --install. Left click still works without it.");
 }
 
 async function inputLinux(args: { kind: "click" | "move" | "drag" | "scroll" | "type" | "key"; x?: number; y?: number; toX?: number; toY?: number; button?: "left" | "right" | "middle"; clicks?: number; wheel?: number; text?: string; key?: string }) {
