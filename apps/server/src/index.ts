@@ -3,7 +3,7 @@ import path from "node:path";
 import { serve } from "@hono/node-server";
 import { ensureDirs, loadConfig } from "./config.js";
 import { Db } from "./db.js";
-import { createHttpApp, lanAddresses, uiOrigin } from "./http.js";
+import { createHttpApp, phoneHosts, uiOrigin } from "./http.js";
 import { Hub } from "./hub.js";
 import { RunManager } from "./runs.js";
 import { SpaceService } from "./space.js";
@@ -44,7 +44,7 @@ async function main() {
     },
     (info) => {
       log("info", `listening on http://127.0.0.1:${info.port}`);
-      for (const ip of lanAddresses()) log("info", `phone: ${uiOrigin(cfg, ip)}`);
+      for (const host of phoneHosts()) log("info", `phone: ${uiOrigin(cfg, host)}`);
       log("info", `data dir ${cfg.dataDir}`);
       log("info", `workspace ${cfg.defaultWorkspace}`);
       if (process.send) process.send({ type: "ready", port: info.port });

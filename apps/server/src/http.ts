@@ -15,6 +15,19 @@ export function uiOrigin(cfg: ServerConfig, host: string): string {
   return `http://${host}:${port}`;
 }
 
+/**
+ * Hosts a phone can open. A `.local` name is listed first because a home-screen
+ * icon saved from a raw IP address opens inside the browser, while the same
+ * icon saved from a hostname can open full screen.
+ */
+export function phoneHosts(): string[] {
+  const hosts: string[] = [];
+  const short = os.hostname().trim().replace(/\.local$/i, "");
+  if (/^[A-Za-z0-9-]+$/.test(short)) hosts.push(`${short}.local`);
+  for (const ip of lanAddresses()) if (!hosts.includes(ip)) hosts.push(ip);
+  return hosts;
+}
+
 export function lanAddresses(): string[] {
   const out: string[] = [];
   for (const [, addrs] of Object.entries(os.networkInterfaces())) {
@@ -42,7 +55,7 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
   app.use("/api/*", cors());
 
   app.get("/api/health", (c) => {
-    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: lanAddresses().map((ip) => uiOrigin(cfg, ip)) };
+    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: phoneHosts().map((host) => uiOrigin(cfg, host)) };
     return c.json(info);
   });
 
@@ -61,11 +74,11 @@ export function createHttpApp(cfg: ServerConfig, db: Db, space: SpaceService, pr
     if (!dev) return c.json({ error: "unauthorized" }, 401);
     const { code, expiresAt } = db.createPairing(space.spaceId);
     const hostHeader = (c.req.header("host") ?? `localhost:${cfg.port}`).split(":")[0];
-    const lan = lanAddresses()[0];
-    const base = uiOrigin(cfg, lan ?? hostHeader);
+    const hosts = phoneHosts();
+    const base = uiOrigin(cfg, hosts[0] ?? hostHeader);
     const url = `${base}/#/pair/${code}`;
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#0b0b0f", light: "#ffffff" } });
-    const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: lanAddresses().map((ip) => uiOrigin(cfg, ip)) };
+    const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: hosts.map((host) => uiOrigin(cfg, host)) };
     return c.json(ticket);
   });
 

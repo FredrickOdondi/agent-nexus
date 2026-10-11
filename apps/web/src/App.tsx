@@ -10,7 +10,7 @@ import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { LinkDevice } from "@/components/onboarding/LinkDevice";
 import { TOKEN_KEY, useStore } from "@/lib/store";
-import { isElectron, isMac } from "@/lib/platform";
+import { isElectron, isMac, isStandalonePwa } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 function useMediaQuery(query: string) {
@@ -98,7 +98,7 @@ function Shell() {
   }, [setSidebar]);
 
   return (
-    <div className={cn("flex h-dvh w-full overflow-hidden bg-background text-foreground", isElectron && "rounded-none")}>
+    <div className={cn("flex h-dvh w-full overflow-hidden bg-background text-foreground", isElectron && "rounded-none", isStandalonePwa && "safe-top")}>
       {isDesktopLayout ? (
         <motion.div
           initial={false}

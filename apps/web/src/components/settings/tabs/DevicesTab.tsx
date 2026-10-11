@@ -45,7 +45,7 @@ export function DevicesTab() {
 
   return (
     <div>
-      <Section title="Link a phone or another computer" description="The phone and this computer must be on the same Wi-Fi. localhost only works on this computer, so the phone uses the address below.">
+      <Section title="Link a phone or another computer" description="Use the address ending in .local for the home screen icon. A shortcut saved from a 192.168 address always opens inside the browser.">
         <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
           <div className="flex size-56 items-center justify-center rounded-2xl border bg-white p-3 elevation-1 dark:bg-white">
             <AnimatePresence mode="wait">
@@ -61,7 +61,7 @@ export function DevicesTab() {
           <div className="flex flex-col gap-3">
             <div>
               <p className="text-sm font-medium">1. Open Nimbus on the other device</p>
-              <p className="text-xs text-muted-foreground">Scan the QR with the phone camera, or type this address into the phone browser: {ticket?.lanUrls[0] ? <span className="font-mono">{ticket.lanUrls[0]}</span> : "generate a code to see it"}. Do not use localhost on the phone.</p>
+              <p className="text-xs text-muted-foreground">On an iPhone, open {ticket?.lanUrls[0] ? <span className="font-mono break-all">{ticket.lanUrls[0].replace(/\/$/, "")}</span> : "the .local address"} in Safari, then Share → Add to Home Screen. Delete any older shortcut that uses a 192.168 address.{ticket && ticket.lanUrls.length > 1 ? <> If the name does not load, use <span className="font-mono break-all">{ticket.lanUrls[ticket.lanUrls.length - 1]}</span>.</> : null}</p>
             </div>
             <div>
               <p className="text-sm font-medium">2. Enter the 6-digit code</p>
