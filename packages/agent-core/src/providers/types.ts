@@ -1,8 +1,13 @@
 import type { Citation } from "@nimbus/shared";
 import type { JsonSchema } from "../types.js";
 
+export interface ProviderImage {
+  /** data URL or https URL */
+  url: string;
+}
+
 export type ProviderMessage =
-  | { role: "user"; content: string }
+  | { role: "user"; content: string; images?: ProviderImage[] }
   | { role: "assistant"; content: string; reasoning?: string; toolCalls?: { id: string; name: string; args: Record<string, unknown> }[] }
   | { role: "tool"; toolCallId: string; name: string; content: string };
 

@@ -24,6 +24,8 @@ export interface ToolResult {
   isError?: boolean;
   /** Extra parts to append to the assistant message (images, questions…). */
   parts?: Part[];
+  /** Images shown to the model with this result. Kept out of the stored tool text. */
+  images?: { url: string }[];
 }
 
 export type ToolCategory = ToolInfo["category"];
@@ -41,7 +43,7 @@ export interface ToolDefinition<A = Record<string, unknown>> {
   source?: "builtin" | "provider" | "mcp" | "composio";
   description: string;
   parameters: JsonSchema;
-  /** Which permission prefix gates this tool (Bash, Edit, Write, Read, Grep, WebFetch, MCPTool). */
+  /** Which permission prefix gates this tool (Bash, Edit, Write, Read, Grep, WebFetch, MCPTool, Computer). */
   permission: PermissionClass | null;
   /** Read-only tools stay enabled in plan/read_only mode. */
   readOnly: boolean;
@@ -52,7 +54,7 @@ export interface ToolDefinition<A = Record<string, unknown>> {
   execute: (args: A, ctx: ToolContext) => Promise<ToolResult>;
 }
 
-export type PermissionClass = "Bash" | "Edit" | "Write" | "Read" | "Grep" | "WebFetch" | "MCPTool" | "Task";
+export type PermissionClass = "Bash" | "Edit" | "Write" | "Read" | "Grep" | "WebFetch" | "MCPTool" | "Task" | "Computer";
 
 export type PermissionDecision = "allow" | "ask" | "deny";
 

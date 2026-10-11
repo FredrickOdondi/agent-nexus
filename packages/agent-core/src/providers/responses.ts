@@ -26,7 +26,11 @@ export class ResponsesProvider implements LLMProvider {
   private toInput(messages: ProviderMessage[]) {
     const input: unknown[] = [];
     for (const m of messages) {
-      if (m.role === "user") input.push({ role: "user", content: m.content });
+      if (m.role === "user") {
+        input.push(m.images?.length
+          ? { role: "user", content: [{ type: "input_text", text: m.content }, ...m.images.map((img) => ({ type: "input_image", image_url: img.url }))] }
+          : { role: "user", content: m.content });
+      }
       else if (m.role === "assistant") {
         if (m.content) input.push({ role: "assistant", content: m.content });
         for (const tc of m.toolCalls ?? []) input.push({ type: "function_call", call_id: tc.id, name: tc.name, arguments: JSON.stringify(tc.args) });

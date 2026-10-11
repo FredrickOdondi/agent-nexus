@@ -57,6 +57,16 @@ export function renderSystemPrompt(ctx: PromptContext): string {
     lines.push("");
   }
 
+  if (ctx.tools.some((tool) => tool.id === "computer")) {
+    lines.push("# Screen");
+    lines.push("You can see and click the computer this agent runs on with the computer tool. A linked phone only sends the chat; the pointer moves on that computer.");
+    lines.push("- Call action screenshot first. The image comes back in the next message. Coordinates are pixels of that image, origin at the top-left.");
+    lines.push("- Then click, double_click, right_click, move, drag, scroll, type, or key. Each action returns a new screenshot.");
+    lines.push("- Use it only when the user asked you to operate the screen. Ask before you send, delete, pay, or accept a permission dialog.");
+    lines.push("- If a call fails, tell the user the error. On macOS that usually means allowing Nimbus under Accessibility and Screen Recording. On Linux it usually means installing xdotool.");
+    lines.push("");
+  }
+
   if (ctx.tools.some((tool) => tool.id.startsWith("COMPOSIO_"))) {
     lines.push("# Connected apps");
     lines.push("The user can connect outside apps (Gmail, GitHub, Slack, Notion, and others). Use the Composio tools for anything that lives in those apps.");

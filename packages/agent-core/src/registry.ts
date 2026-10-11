@@ -1,5 +1,6 @@
 import type { ToolInfo } from "@nimbus/shared";
 import type { ToolDefinition } from "./types.js";
+import { computerTool } from "./tools/computer.js";
 import { globTool, listDir, readFile, searchReplace, writeFile } from "./tools/files.js";
 import { grep } from "./tools/grep.js";
 import { imageGen } from "./tools/image.js";
@@ -27,6 +28,7 @@ export const BUILTIN_TOOLS: ToolDefinition<any>[] = [
   exitPlanMode,
   skillTool,
   imageGen,
+  computerTool,
 ];
 
 export interface RegistryOptions {
@@ -75,6 +77,7 @@ export class ToolRegistry {
     }
     if (opts.profile && opts.profile !== "main") {
       drop.add("memory");
+      drop.add("computer");
     }
 
     tools = tools.filter((t) => !drop.has(t.id));

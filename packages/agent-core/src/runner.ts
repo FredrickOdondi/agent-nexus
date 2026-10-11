@@ -233,7 +233,7 @@ export class AgentRunner {
       profile,
     });
     if (this.opts.mode === "chat") {
-      const chatTools = new Set(["web_search", "web_fetch", "image_gen", "memory", "ask_user_question"]);
+      const chatTools = new Set(["web_search", "web_fetch", "image_gen", "memory", "ask_user_question", "computer"]);
       this.tools = this.tools.filter((tool) => chatTools.has(tool.id) || tool.id.startsWith("COMPOSIO_"));
     }
     this.hooks = await discoverHooks(this.opts.cwd);
@@ -380,8 +380,18 @@ export class AgentRunner {
 
         const results = await Promise.all(pending.map((p) => this.executeTool(p, services)));
         toolCalls += results.length;
+        const shots: { url: string }[] = [];
         for (let i = 0; i < pending.length; i++) {
-          messages.push({ role: "tool", toolCallId: pending[i].id, name: pending[i].name, content: results[i] });
+          messages.push({ role: "tool", toolCallId: pending[i].id, name: pending[i].name, content: results[i].content });
+          const images = results[i]?.images;
+          if (images?.length) shots.push(...images);
+        }
+        if (shots.length && this.opts.provider.kind !== "mock") {
+          messages.push({
+            role: "user",
+            content: "Latest screenshot from the computer tool. Coordinates in the next computer call are pixels of this image, origin at the top-left.",
+            images: shots.slice(-1),
+          });
         }
         messages = trimHistory(messages);
         if (this.opts.signal.aborted) return { status: "cancelled", text: finalText, toolCalls, turns };
@@ -396,7 +406,7 @@ export class AgentRunner {
     }
   }
 
-  private async executeTool(call: { id: string; name: string; args: Record<string, unknown>; index: number }, services: SessionServices): Promise<string> {
+  private async executeTool(call: { id: string; name: string; args: Record<string, unknown>; index: number }, services: SessionServices): Promise<{ content: string; images?: { url: string }[] }> {
     const tool = this.tools.find((t) => t.id === call.name);
     const base: ToolCallPart = { type: "tool_call", id: call.id, name: call.name, title: tool?.title ?? call.name, args: call.args, status: "running", startedAt: Date.now() };
     const finish = (patch: Partial<ToolCallPart>) => this.sink.updatePart(call.index, { ...base, ...patch, endedAt: Date.now() });
@@ -404,14 +414,14 @@ export class AgentRunner {
     if (!tool) {
       const msg = `Unknown tool: ${call.name}. Available: ${this.tools.map((t) => t.id).join(", ")}`;
       finish({ status: "error", error: msg, result: msg });
-      return msg;
+      return { content: msg };
     }
 
     const decision = evaluatePermission(tool, call.args, this.permissionConfig());
     if (decision === "deny") {
       const msg = this.planActive && !tool.readOnly ? "Blocked: plan mode is active. Call exit_plan_mode to request approval before making changes." : `Permission denied by policy for ${tool.id}.`;
       finish({ status: "denied", error: msg, result: msg });
-      return msg;
+      return { content: msg };
     }
 
     const summary = tool.summarize ? safeSummary(() => tool.summarize!(call.args)) : call.name;
@@ -419,7 +429,7 @@ export class AgentRunner {
     if (pre.permission === "deny") {
       const msg = `Blocked by PreToolUse hook${pre.reason ? `: ${pre.reason}` : ""}.`;
       finish({ status: "denied", error: msg, result: msg });
-      return msg;
+      return { content: msg };
     }
 
     if (decision === "ask" || pre.permission === "ask") {
@@ -428,7 +438,7 @@ export class AgentRunner {
       if (answer === "deny") {
         const msg = "The user denied this action. Ask how they'd like to proceed instead.";
         finish({ status: "denied", error: msg, result: msg });
-        return msg;
+        return { content: msg };
       }
       if (answer === "allow_always") this.sessionAllow.add(tool.id);
     }
@@ -462,7 +472,7 @@ export class AgentRunner {
       display: result.display as ToolDisplay | undefined,
     });
     for (const extra of result.parts ?? []) this.sink.addPart(extra);
-    return clampText(output, 40_000);
+    return { content: clampText(output, 40_000), images: result.images };
   }
 }
 
@@ -475,6 +485,13 @@ function safeSummary(fn: () => string): string {
 }
 
 function trimHistory(messages: ProviderMessage[]): ProviderMessage[] {
+  let keptShot = false;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m?.role !== "user" || !m.images?.length) continue;
+    if (!keptShot) { keptShot = true; continue; }
+    messages[i] = { role: "user", content: `${m.content}\n[Earlier screenshot omitted.]` };
+  }
   let total = messages.reduce((n, m) => n + ("content" in m ? m.content.length + ("reasoning" in m ? (m.reasoning?.length ?? 0) : 0) : 0), 0);
   if (total <= MAX_HISTORY_CHARS) return messages;
   const out = [...messages];

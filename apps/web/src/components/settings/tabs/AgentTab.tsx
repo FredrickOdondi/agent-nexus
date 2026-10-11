@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { Field, Section, ToggleRow, selectClass } from "../SettingsDialog";
 
 const MODES: { value: PermissionMode; label: string; hint: string }[] = [
-  { value: "ask", label: "Ask before changes", hint: "Reads are automatic; edits, commands and MCP calls need approval from any device." },
+  { value: "ask", label: "Ask before changes", hint: "Reads are automatic. Edits, commands, and screen clicks need approval from any device." },
   { value: "auto", label: "Always approve", hint: "Fully autonomous. Deny rules still apply." },
   { value: "plan", label: "Plan only", hint: "Research and plan; all mutations blocked until plan approval." },
   { value: "read_only", label: "Read only", hint: "No edits or commands at all." },
@@ -84,10 +84,10 @@ export function AgentTab() {
           ))}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Allow rules" hint="One per line. e.g. Bash(git *), Edit(src/**), WebFetch(domain:docs.rs)">
+          <Field label="Allow rules" hint="One per line. e.g. Bash(git *), Edit(src/**), Computer(screenshot)">
             <Textarea value={allow} onChange={(e) => setAllow(e.target.value)} rows={4} className="font-mono text-xs" />
           </Field>
-          <Field label="Deny rules" hint="Always win. e.g. Bash(rm -rf *), Write(.env*), MCPTool(*)">
+          <Field label="Deny rules" hint="Always win. e.g. Bash(rm -rf *), Write(.env*), Computer(*)">
             <Textarea value={deny} onChange={(e) => setDeny(e.target.value)} rows={4} className="font-mono text-xs" />
           </Field>
         </div>

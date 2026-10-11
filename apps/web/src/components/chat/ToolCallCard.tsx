@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bot,
@@ -15,6 +15,7 @@ import {
   ListChecks,
   Loader2,
   Lock,
+  MousePointer2,
   Plug,
   Search,
   ShieldAlert,
@@ -47,6 +48,7 @@ const ICONS: Record<string, typeof Terminal> = {
   exit_plan_mode: Sparkles,
   skill: Sparkles,
   image_gen: ImageIcon,
+  computer: MousePointer2,
 };
 
 function headline(part: ToolCallPart): string {
@@ -64,6 +66,13 @@ function headline(part: ToolCallPart): string {
     case "memory": return `${a.action ?? "read"} ${a.scope ?? "workspace"}`;
     case "skill": return String(a.name ?? "");
     case "image_gen": return String(a.prompt ?? "");
+    case "computer": {
+      const action = String(a.action ?? "screenshot");
+      if (action === "type") return `type ${String(a.text ?? "").slice(0, 80)}`;
+      if (action === "key") return `key ${String(a.key ?? "")}`;
+      if (a.x != null) return `${action} ${a.x},${a.y ?? "?"}`;
+      return action;
+    }
     default: {
       if (part.name.startsWith("COMPOSIO_")) {
         const query = a.query ?? a.toolkit ?? a.tool_slug ?? a.use_case;
@@ -88,6 +97,9 @@ function StatusIcon({ status }: { status: ToolCallPart["status"] }) {
 
 export function ToolCallCard({ part, defaultOpen = false }: { part: ToolCallPart; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    if (part.name === "computer" && part.display?.kind === "image") setOpen(true);
+  }, [part.name, part.display]);
   const Icon = part.name.startsWith("COMPOSIO_") ? Plug : (ICONS[part.name] ?? Wrench);
   const title = headline(part);
   const duration = part.startedAt && part.endedAt ? Math.max(0, part.endedAt - part.startedAt) : null;

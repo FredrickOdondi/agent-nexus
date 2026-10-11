@@ -12,7 +12,7 @@ interface ParsedRule {
   pattern: string;
 }
 
-const PREFIXES: PermissionClass[] = ["Bash", "Edit", "Write", "Read", "Grep", "WebFetch", "MCPTool", "Task"];
+const PREFIXES: PermissionClass[] = ["Bash", "Edit", "Write", "Read", "Grep", "WebFetch", "MCPTool", "Task", "Computer"];
 
 export function parseRule(rule: string): ParsedRule | null {
   const m = /^(\w+)\((.*)\)$/.exec(rule.trim());

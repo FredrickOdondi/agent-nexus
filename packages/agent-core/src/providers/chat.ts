@@ -13,7 +13,11 @@ export class ChatCompletionsProvider implements LLMProvider {
   private toMessages(system: string, messages: ProviderMessage[]) {
     const out: unknown[] = [{ role: "system", content: system }];
     for (const m of messages) {
-      if (m.role === "user") out.push({ role: "user", content: m.content });
+      if (m.role === "user") {
+        out.push(m.images?.length
+          ? { role: "user", content: [{ type: "text", text: m.content }, ...m.images.map((img) => ({ type: "image_url", image_url: { url: img.url } }))] }
+          : { role: "user", content: m.content });
+      }
       else if (m.role === "assistant") {
         out.push({
           role: "assistant",

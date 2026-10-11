@@ -25,6 +25,7 @@ export const BUILTIN_TOOL_CATALOG: Omit<ToolInfo, "enabled">[] = [
   { id: "exit_plan_mode", title: "exit_plan_mode", category: "workflow", source: "builtin", description: "Submit the plan for approval and leave plan mode." },
   { id: "skill", title: "skill", category: "workflow", source: "builtin", description: "Load a SKILL.md into context by name." },
   { id: "image_gen", title: "image_gen", category: "external", source: "builtin", description: "Generate an image with the configured provider (xAI grok-imagine)." },
+  { id: "computer", title: "screen", category: "external", source: "builtin", description: "See the computer's screen and click, type, or scroll. Clicks happen on the machine running Nimbus." },
   { id: "x_search", title: "x_search", category: "external", source: "provider", description: "Search X posts, users and threads (xAI server-side tool)." },
   { id: "code_execution", title: "code_execution", category: "external", source: "provider", description: "Run Python in xAI's sandbox (xAI server-side tool)." },
 ];

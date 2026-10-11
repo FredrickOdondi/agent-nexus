@@ -15,7 +15,8 @@ export class MockProvider implements LLMProvider {
     const text = lastUser?.content ?? "";
     const toolNames = new Set(req.tools.map((t) => t.name));
 
-    if (last?.role === "tool") {
+    const sawTools = last?.role === "tool" || (last?.role === "user" && Boolean(last.images?.length));
+    if (sawTools) {
       yield* this.summariseTools(req.messages, req.signal);
       return;
     }
@@ -39,6 +40,12 @@ export class MockProvider implements LLMProvider {
     if (/\b(find|grep|where is|which file|search (for|the) code)\b/.test(lower) && wantsTool("grep")) {
       const m = /["'`]([^"'`]+)["'`]/.exec(text);
       yield { type: "tool_call", id: id(), name: "grep", args: { pattern: m?.[1] ?? text.split(/\s+/).slice(-1)[0], max_results: 40 } };
+      yield { type: "done", finishReason: "tool_calls" };
+      return;
+    }
+    if (/\b(screenshot|click the screen|click this screen)\b/.test(lower) && wantsTool("computer")) {
+      yield* this.say("I'll look at the screen first.", req.signal);
+      yield { type: "tool_call", id: id(), name: "computer", args: { action: "screenshot" } };
       yield { type: "done", finishReason: "tool_calls" };
       return;
     }
@@ -95,7 +102,9 @@ export class MockProvider implements LLMProvider {
 
   private async *summariseTools(messages: ProviderMessage[], signal: AbortSignal): AsyncGenerator<ProviderEvent> {
     const results = [] as Extract<ProviderMessage, { role: "tool" }>[];
-    for (let i = messages.length - 1; i >= 0 && messages[i].role === "tool"; i--) results.unshift(messages[i] as any);
+    let end = messages.length - 1;
+    if (messages[end]?.role === "user") end--;
+    for (let i = end; i >= 0 && messages[i].role === "tool"; i--) results.unshift(messages[i] as Extract<ProviderMessage, { role: "tool" }>);
     const lines: string[] = [];
     for (const r of results) {
       const preview = r.content.split("\n").filter(Boolean).slice(0, 8).join("\n");
@@ -111,6 +120,9 @@ export class MockProvider implements LLMProvider {
           break;
         case "image_gen":
           lines.push("Here's the generated image. Configure an xAI key in Settings to use grok-imagine for real generations.");
+          break;
+        case "computer":
+          lines.push(preview || "Screen updated. The shot is in the chat.");
           break;
         case "todo_write":
           lines.push("I've laid out the plan above. Say **go** and I'll start on the first item, or adjust any step.");
@@ -140,7 +152,7 @@ function buildReply(text: string): string {
   const t = text.trim();
   if (!t) return "Say something and I'll help.";
   if (/^(hi|hello|hey|yo)\b/i.test(t)) {
-    return "Hey! I'm **Nimbus**, running in offline demo mode.\n\nI can explore your workspace, search the web, edit files, run commands and plan work. Add a DeepSeek API key in **Settings → Model** to unlock the real model.\n\nTry:\n- *Explore the codebase*\n- *Search the web for the latest TypeScript release*\n- *Plan a migration from Next.js to Vite*";
+    return "Hey! I'm **Nimbus**, running in offline demo mode.\n\nI can explore your workspace, search the web, edit files, run commands, plan work, and click this computer's screen. Add a vision model such as Grok in **Settings → Model** to aim those clicks from a screenshot.\n\nTry:\n- *Explore the codebase*\n- *Search the web for the latest TypeScript release*\n- *Take a screenshot*";
   }
   if (/\?$/.test(t)) {
     return `Good question. In demo mode I can't reason about *"${t.slice(0, 80)}"* with a real model yet, but here's how I'd approach it:\n\n1. **Clarify** the exact outcome you want.\n2. **Gather context** — I'd read the relevant files or search the web.\n3. **Propose** a concrete answer with sources or code.\n\nConnect a model in Settings and ask again — I'll do all of this for real, with citations.`;

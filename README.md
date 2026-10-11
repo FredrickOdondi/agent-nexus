@@ -89,7 +89,17 @@ Open **Settings → Model** and paste a key. It stays in the local SQLite databa
 
 ## Tools
 
-The built-in set matches the Grok Build tool surface: `run_terminal_cmd`, `read_file`, `write_file`, `search_replace`, `list_dir`, `glob`, `grep`, `web_search`, `web_fetch`, `todo_write`, `task`, `get_task_output`, `ask_user_question`, `memory`, `enter_plan_mode`, `exit_plan_mode`, `skill`, and `image_gen`. Permission modes (ask, auto, plan, read-only) and allow/deny rules live under **Settings → Agent & tools**.
+The built-in set matches the Grok Build tool surface: `run_terminal_cmd`, `read_file`, `write_file`, `search_replace`, `list_dir`, `glob`, `grep`, `web_search`, `web_fetch`, `todo_write`, `task`, `get_task_output`, `ask_user_question`, `memory`, `enter_plan_mode`, `exit_plan_mode`, `skill`, `image_gen`, and `computer`. Permission modes (ask, auto, plan, read-only) and allow/deny rules live under **Settings → Agent & tools**.
+
+## Screen
+
+The `computer` tool lets the agent see this computer and click it. It screenshots the main display, then clicks, double-clicks, right-clicks, drags, scrolls, types, or presses keys. Each action returns a new screenshot. Coordinates are pixels of that image.
+
+Clicks happen on the machine running the Nimbus server, including when the request comes from a linked phone. Ask mode prompts before every screen action. Allow or deny a single action with rules such as `Computer(screenshot)` and `Computer(*)`.
+
+Aiming needs a model that can see images. Grok and GPT-4.1 can. A text-only model still receives the tool, but it cannot see where to click.
+
+macOS asks for Screen Recording (to capture) and Accessibility (to click). Allow the app that launches Nimbus, Electron or Terminal. Linux on X11 needs `xdotool` and a screenshot tool (`scrot`, ImageMagick, `gnome-screenshot`, or `ffmpeg`). Wayland needs `grim` and `ydotool`.
 
 ## Connected apps
 
