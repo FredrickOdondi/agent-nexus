@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Check, ExternalLink, Eye, EyeOff, KeyRound, Loader2, Plug, RefreshCw } from "lucide-react";
+import { Check, ExternalLink, Eye, EyeOff, KeyRound, Loader2, Plug, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { ComposioAppState, ComposioKeySource } from "@nimbus/shared";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ export function AppsTab() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [custom, setCustom] = useState("");
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -107,6 +108,13 @@ export function AppsTab() {
   };
 
   const list = apps?.apps ?? [];
+  const needle = query.trim().toLowerCase();
+  const filtered = needle
+    ? list.filter((app) => app.name.toLowerCase().includes(needle) || app.slug.includes(needle) || app.blurb.toLowerCase().includes(needle) || (app.category ?? "").toLowerCase().includes(needle))
+    : list;
+  const ready = filtered.filter((app) => app.connected || app.noAuth);
+  const available = filtered.filter((app) => !app.connected && !app.noAuth);
+  const groups = groupApps(available);
 
   return (
     <div>
@@ -130,34 +138,28 @@ export function AppsTab() {
         </Field>
       </Section>
 
-      <Section title="Apps" description="Connect an account, then ask in chat. In Ask mode, actions that change data wait for your approval.">
+      <Section title="Apps" description="The full Composio directory. Connect an account, then ask in chat. In Ask mode, actions that change data wait for your approval.">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? "Open a connect link, approve access, then return to this tab." : "Save a key to see which accounts are already connected."}</p>
+          <p className="text-xs text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? `${list.length} apps. Open a connect link, approve access, then come back.` : "Save a key to load the full directory and see which accounts are already connected."}</p>
           <Button variant="ghost" size="sm" onClick={() => void load()} disabled={loading}><RefreshCw className={cn(loading && "animate-spin")} />Refresh</Button>
+        </div>
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Gmail, Figma, HubSpot…" className="h-11 rounded-xl pl-9 text-base lg:h-9 lg:text-sm" />
         </div>
         {loading && list.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading apps…</div>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No app matches “{query.trim()}”. Connect it by slug below if Composio has it.</p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {list.map((app) => {
-              const ready = app.connected || app.noAuth;
-              return (
-                <li key={app.slug} className="flex items-center gap-3 rounded-xl border bg-surface px-3 py-2.5">
-                  {app.logo ? <img src={app.logo} alt="" className="size-8 rounded-md object-contain" /> : <span className="flex size-8 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">{app.name.slice(0, 1)}</span>}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{app.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{ready ? (app.noAuth && !app.connected ? "No sign-in required" : "Connected") : app.blurb}</span>
-                  </span>
-                  <Button size="sm" variant={ready ? "outline" : "secondary"} disabled={busy === app.slug || source === "none" || !enabled} onClick={() => void connect(app.slug)}>
-                    {busy === app.slug ? <Loader2 className="animate-spin" /> : ready ? <Check /> : <Plug />}
-                    {ready ? "Reconnect" : "Connect"}
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="space-y-5">
+            {ready.length > 0 && <AppGroup title="Ready" apps={ready} busy={busy} canConnect={source !== "none" && enabled} onConnect={connect} />}
+            {groups.map((group) => (
+              <AppGroup key={group.title} title={group.title} apps={group.apps} busy={busy} canConnect={source !== "none" && enabled} onConnect={connect} />
+            ))}
+          </div>
         )}
-        <Field label="Another app" hint="Any Composio toolkit slug, for example figma or hubspot.">
+        <Field label="Connect by slug" hint="Use this when an app is missing from the directory. The slug is the Composio id, such as figma or hubspot.">
           <div className="flex gap-2">
             <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="figma" className="font-mono text-xs" />
             <Button variant="outline" disabled={!custom.trim() || busy === custom.trim().toLowerCase() || source === "none" || !enabled} onClick={() => void connect(custom)}>
@@ -168,4 +170,46 @@ export function AppsTab() {
       </Section>
     </div>
   );
+}
+
+function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string; apps: ComposioAppState[]; busy: string | null; canConnect: boolean; onConnect: (slug: string) => void }) {
+  if (apps.length === 0) return null;
+  return (
+    <div>
+      <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{title}</p>
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {apps.map((app) => {
+          const ready = app.connected || app.noAuth;
+          return (
+            <li key={app.slug} className="flex items-center gap-3 rounded-xl border bg-surface px-3 py-2.5">
+              {app.logo ? <img src={app.logo} alt="" loading="lazy" className="size-8 rounded-md bg-white object-contain" /> : <span className="flex size-8 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground">{app.name.slice(0, 1)}</span>}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{app.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">{ready ? (app.noAuth && !app.connected ? "No sign-in required" : "Connected") : app.blurb}</span>
+              </span>
+              <Button size="sm" variant={ready ? "outline" : "secondary"} className="max-lg:h-10" disabled={busy === app.slug || !canConnect} onClick={() => onConnect(app.slug)}>
+                {busy === app.slug ? <Loader2 className="animate-spin" /> : ready ? <Check /> : <Plug />}
+                {ready ? "Reconnect" : "Connect"}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function groupApps(apps: ComposioAppState[]): { title: string; apps: ComposioAppState[] }[] {
+  const hasCategories = apps.some((app) => app.category);
+  if (!hasCategories) return apps.length ? [{ title: "All apps", apps }] : [];
+  const buckets = new Map<string, ComposioAppState[]>();
+  for (const app of apps) {
+    const title = app.category?.trim() || "Other";
+    const list = buckets.get(title);
+    if (list) list.push(app);
+    else buckets.set(title, [app]);
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]) || b[1].length - a[1].length)
+    .map(([title, items]) => ({ title, apps: items }));
 }

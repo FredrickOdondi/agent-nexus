@@ -16,8 +16,9 @@ interface OpenedSession {
     sessionId: string;
     execute(toolSlug: string, arguments_?: Record<string, unknown>, options?: undefined, requestOptions?: { signal?: AbortSignal }): Promise<{ data: Record<string, unknown>; error: string | null }>;
     authorize(toolkit: string): Promise<{ id: string; redirectUrl?: string | null }>;
-    toolkits(options?: { toolkits?: string[]; isConnected?: boolean; search?: string; limit?: number }): Promise<{
+    toolkits(options?: { toolkits?: string[]; isConnected?: boolean; search?: string; limit?: number; cursor?: string }): Promise<{
       items: { slug: string; name: string; isNoAuth: boolean; logo?: string; connection?: { isActive: boolean } }[];
+      cursor?: string;
     }>;
   };
   composio: Composio;
@@ -160,28 +161,111 @@ function toApp(base: { slug: string; name: string; blurb: string }, item?: Toolk
   };
 }
 
-/** Connection state for the settings catalog, plus any other apps already connected. */
+interface CatalogApp {
+  slug: string;
+  name: string;
+  blurb: string;
+  logo?: string;
+  category?: string;
+  noAuth: boolean;
+}
+
+interface ToolkitPage {
+  items?: Array<{
+    slug?: string;
+    name?: string;
+    no_auth?: boolean;
+    meta?: { description?: string; logo?: string; categories?: Array<{ name?: string }> };
+  }>;
+  next_cursor?: string | null;
+}
+
+const catalogCache = new Map<string, { at: number; items: CatalogApp[] }>();
+const CATALOG_TTL_MS = 10 * 60_000;
+
+function shorten(text: string | undefined): string {
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return "Connect this app";
+  return clean.length > 96 ? `${clean.slice(0, 93)}…` : clean;
+}
+
+/** Every toolkit Composio can connect, paged past the 1,000-item cap. */
+async function fetchToolkitCatalog(composio: Composio, apiKey: string): Promise<CatalogApp[]> {
+  const key = cacheKey(apiKey, "catalog");
+  const hit = catalogCache.get(key);
+  if (hit && Date.now() - hit.at < CATALOG_TTL_MS) return hit.items;
+
+  const client = composio.getClient();
+  const items: CatalogApp[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const result = (await client.toolkits.list(
+      { limit: 1000, sort_by: "alphabetically", cursor },
+      { signal: AbortSignal.timeout(25_000) },
+    )) as ToolkitPage;
+    for (const item of result.items ?? []) {
+      const slug = item.slug?.trim().toLowerCase();
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      items.push({
+        slug,
+        name: item.name?.trim() || slug,
+        blurb: shorten(item.meta?.description),
+        logo: item.meta?.logo,
+        category: item.meta?.categories?.find((category) => category.name?.trim())?.name?.trim(),
+        noAuth: Boolean(item.no_auth),
+      });
+    }
+    const next = result.next_cursor?.trim();
+    if (!next || next === cursor) break;
+    cursor = next;
+  }
+  if (items.length === 0) throw new Error("Composio returned no apps");
+  items.sort((a, b) => a.name.localeCompare(b.name));
+  catalogCache.set(key, { at: Date.now(), items });
+  return items;
+}
+
+async function fetchConnections(session: OpenedSession["session"]): Promise<Map<string, ToolkitItem>> {
+  const bySlug = new Map<string, ToolkitItem>();
+  let cursor: string | undefined;
+  for (let page = 0; page < 20; page++) {
+    const result = await session.toolkits({ isConnected: true, limit: 50, cursor });
+    for (const item of result.items) bySlug.set(item.slug.toLowerCase(), item);
+    if (!result.cursor || result.cursor === cursor) break;
+    cursor = result.cursor;
+  }
+  return bySlug;
+}
+
+/** The full Composio directory, with connection state for this space. */
 export async function listComposioApps(input: OpenComposioInput): Promise<ComposioAppState[]> {
   try {
     const opened = await openComposioSession(input);
-    const slugs = COMPOSIO_APP_CATALOG.map((app) => app.slug);
-    const [known, connected] = await Promise.all([
-      opened.session.toolkits({ toolkits: slugs, limit: slugs.length }),
-      opened.session.toolkits({ isConnected: true, limit: 50 }),
+    const [catalog, connections] = await Promise.all([
+      fetchToolkitCatalog(opened.composio, input.apiKey),
+      fetchConnections(opened.session),
     ]);
-    const bySlug = new Map<string, ToolkitItem>();
-    for (const item of [...known.items, ...connected.items]) bySlug.set(item.slug.toLowerCase(), item);
     const seen = new Set<string>();
-    const apps = COMPOSIO_APP_CATALOG.map((app) => {
+    const apps: ComposioAppState[] = catalog.map((app) => {
       seen.add(app.slug);
-      return toApp(app, bySlug.get(app.slug));
+      const live = connections.get(app.slug);
+      return {
+        slug: app.slug,
+        name: live?.name || app.name,
+        blurb: app.blurb,
+        logo: live?.logo || app.logo,
+        category: app.category,
+        connected: Boolean(live?.connection?.isActive),
+        noAuth: app.noAuth || Boolean(live?.isNoAuth),
+      };
     });
-    for (const item of connected.items) {
-      const slug = item.slug.toLowerCase();
+    for (const [slug, item] of connections) {
       if (seen.has(slug)) continue;
-      seen.add(slug);
       apps.push(toApp({ slug, name: item.name, blurb: "Connected" }, item));
     }
+    apps.sort((a, b) => Number(b.connected) - Number(a.connected) || a.name.localeCompare(b.name));
     return apps;
   } catch (error) {
     const message = redact(error instanceof Error ? error.message : String(error), input.apiKey);

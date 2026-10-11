@@ -225,6 +225,8 @@ export interface ComposioAppState {
   name: string;
   blurb: string;
   logo?: string;
+  /** First Composio category, used to group the directory. */
+  category?: string;
   connected: boolean;
   noAuth: boolean;
 }

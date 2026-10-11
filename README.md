@@ -76,7 +76,7 @@ The built-in set matches the Grok Build tool surface: `run_terminal_cmd`, `read_
 
 ## Connected apps
 
-**Settings → Apps** uses [Composio](https://composio.dev) so the agent can work in Gmail, GitHub, Slack, Notion, and other accounts you connect. The agent searches for the right action, asks you to approve changes, and only runs it inside your Composio session.
+**Settings → Apps** uses [Composio](https://composio.dev). With a key saved, that screen lists the full toolkit directory (Gmail, GitHub, Slack, Notion, Figma, HubSpot, and the rest Composio offers), grouped and searchable. The agent searches for the right action, asks you to approve changes, and only runs it inside your Composio session.
 
 Paste a Composio API key in that tab, or set `COMPOSIO_API_KEY` before `pnpm dev`. The key is stored in the local database (or read from the environment) and is never synced to a linked phone. Copy `.env.example` to `.env` if you want the environment variable loaded automatically. A key saved in Settings replaces the environment variable.
 
