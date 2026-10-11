@@ -160,19 +160,76 @@ function createWindow(url: string) {
 
   mainWindow.once("ready-to-show", () => mainWindow?.show());
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
-    if (/^https?:\/\//.test(target)) void shell.openExternal(target);
+    if (isHttpUrl(target)) {
+      void openHttpUrl(target).catch((error) => console.error("[nimbus] could not open the browser", error));
+    }
     return { action: "deny" };
   });
   mainWindow.on("closed", () => { mainWindow = null; });
   void mainWindow.loadURL(url);
 }
 
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function launch(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { stdio: "ignore", windowsHide: true });
+    const timer = setTimeout(() => {
+      child.unref();
+      resolve();
+    }, 4000);
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new Error(`${command} exited ${code ?? "unknown"}`));
+    });
+  });
+}
+
+/** Hand the link to the OS so the default browser comes forward. shell.openExternal can resolve without showing a window. */
+async function openHttpUrl(raw: string): Promise<void> {
+  const target = new URL(raw.trim()).toString();
+  const viaShell = () => shell.openExternal(target);
+  try {
+    if (process.platform === "darwin") await launch("/usr/bin/open", [target]);
+    else if (process.platform === "win32") await viaShell();
+    else await launch("xdg-open", [target]);
+  } catch (error) {
+    try {
+      if (process.platform === "win32") await launch("rundll32.exe", ["url.dll,FileProtocolHandler", target]);
+      else await viaShell();
+    } catch (fallback) {
+      throw fallback instanceof Error ? fallback : error;
+    }
+  }
+}
+
 function registerIpc() {
   ipcMain.on("nimbus:meta", (event) => {
     event.returnValue = { version: app.getVersion(), serverUrl };
   });
-  ipcMain.handle("nimbus:open-external", (_e, url: unknown) => {
-    if (typeof url === "string" && /^https?:\/\//.test(url)) void shell.openExternal(url);
+  ipcMain.handle("nimbus:open-external", async (_e, url: unknown) => {
+    if (!isHttpUrl(url)) return false;
+    try {
+      await openHttpUrl(url);
+      mainWindow?.blur();
+      return true;
+    } catch (error) {
+      console.error("[nimbus] could not open the browser", error);
+      return false;
+    }
   });
   ipcMain.handle("nimbus:pick-folder", async () => {
     const parent = BrowserWindow.getFocusedWindow() ?? mainWindow;

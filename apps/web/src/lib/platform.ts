@@ -4,7 +4,7 @@ export interface NimbusBridge {
   platform: string;
   version: string;
   isElectron: true;
-  openExternal(url: string): void;
+  openExternal(url: string): Promise<boolean>;
   pickFolder(): Promise<string | null>;
   window: { minimize(): void; maximize(): void; close(): void; isMaximized(): Promise<boolean> };
   serverUrl: string;
@@ -14,6 +14,11 @@ declare global {
   interface Window {
     nimbus?: NimbusBridge;
   }
+}
+
+function desktopBridge(): NimbusBridge | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.nimbus;
 }
 
 export const bridge = typeof window !== "undefined" ? window.nimbus : undefined;
@@ -39,9 +44,48 @@ export function defaultDeviceName(): string {
   return "Browser";
 }
 
-export function openExternal(url: string) {
-  if (bridge) bridge.openExternal(url);
-  else window.open(url, "_blank", "noopener,noreferrer");
+export function safeHttpUrl(value: string): string | null {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Open a blank tab during the click, before any await, so the browser allows the later navigation. */
+export function reserveExternalTab(): Window | null {
+  if (desktopBridge()?.isElectron) return null;
+  if (typeof window === "undefined") return null;
+  return window.open("about:blank", "_blank");
+}
+
+export async function openExternal(url: string, reserved?: Window | null): Promise<boolean> {
+  const target = safeHttpUrl(url);
+  if (!target) {
+    if (reserved && !reserved.closed) reserved.close();
+    return false;
+  }
+  if (reserved && !reserved.closed) {
+    try {
+      reserved.location.replace(target);
+      reserved.opener = null;
+      return true;
+    } catch {
+      reserved.close();
+    }
+  }
+  const host = desktopBridge();
+  if (host?.openExternal) {
+    try {
+      return (await host.openExternal(target)) !== false;
+    } catch {
+      return false;
+    }
+  }
+  const opened = window.open(target, "_blank", "noopener,noreferrer");
+  return opened != null;
 }
 
 export const isStandalonePwa = typeof window !== "undefined" && (window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true);

@@ -5,7 +5,7 @@ import type { ComposioAppState, ComposioKeySource } from "@nimbus/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TOKEN_KEY, useStore } from "@/lib/store";
-import { openExternal } from "@/lib/platform";
+import { openExternal, reserveExternalTab } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { Field, Section, ToggleRow } from "../SettingsDialog";
 
@@ -34,6 +34,7 @@ export function AppsTab() {
   const [busy, setBusy] = useState<string | null>(null);
   const [custom, setCustom] = useState("");
   const [query, setQuery] = useState("");
+  const [pendingLink, setPendingLink] = useState<{ slug: string; name: string; url: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -54,8 +55,16 @@ export function AppsTab() {
   useEffect(() => {
     const onFocus = () => { if (document.visibilityState === "visible") void load(); };
     document.addEventListener("visibilitychange", onFocus);
-    return () => document.removeEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [load]);
+  useEffect(() => {
+    if (!pendingLink) return;
+    if (apps?.apps.some((app) => app.slug === pendingLink.slug && app.connected)) setPendingLink(null);
+  }, [apps, pendingLink]);
 
   if (!settings) return null;
   const source = settings.composioKeySource ?? (settings.hasComposioApiKey ? "settings" : "none");
@@ -90,17 +99,27 @@ export function AppsTab() {
     }
   };
 
-  const connect = async (toolkit: string) => {
+  const connect = async (toolkit: string, popup: Window | null = null) => {
     const slug = toolkit.trim().toLowerCase();
-    if (!slug) return;
+    if (!slug) {
+      popup?.close();
+      return;
+    }
     setBusy(slug);
     try {
       const res = await authed("/api/composio/connect", { method: "POST", body: JSON.stringify({ toolkit: slug }) });
       const body = (await res.json()) as { redirectUrl?: string; error?: string };
       if (!res.ok || !body.redirectUrl) throw new Error(body.error || "No connect link was returned");
-      openExternal(body.redirectUrl);
-      toast.success("Finish connecting in the browser, then come back here");
+      const name = apps?.apps.find((app) => app.slug === slug)?.name ?? slug;
+      setPendingLink({ slug, name, url: body.redirectUrl });
+      const opened = await openExternal(body.redirectUrl, popup);
+      if (!opened) {
+        toast.error(`The browser did not open. Use Open browser to finish connecting ${name}.`);
+        return;
+      }
+      toast.success(`Finish connecting ${name} in the browser, then come back here`);
     } catch (error) {
+      popup?.close();
       toast.error(error instanceof Error ? error.message : "Could not connect");
     } finally {
       setBusy(null);
@@ -149,6 +168,14 @@ export function AppsTab() {
           <Button variant="outline" size="icon" className="size-11 shrink-0 rounded-xl lg:size-9" onClick={() => void load()} disabled={loading} aria-label="Refresh apps"><RefreshCw className={cn("size-4", loading && "animate-spin")} /></Button>
         </div>
         <p className="text-xs leading-relaxed text-muted-foreground">{apps?.error ? apps.error : enabled && source !== "none" ? `${connectedApps.length} connected · ${available.length} not connected. A check means the account is linked.` : "Save a key to load every app and see which accounts are connected."}</p>
+        {pendingLink && (
+          <div className="flex flex-col gap-2 rounded-xl border bg-muted/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm">Finish connecting {pendingLink.name} in your browser. Come back here when you are done.</p>
+            <Button className="h-11 lg:h-8" onClick={() => void openExternal(pendingLink.url)}>
+              <ExternalLink />Open browser
+            </Button>
+          </div>
+        )}
         {loading && list.length === 0 ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading apps…</div>
         ) : filtered.length === 0 ? (
@@ -174,7 +201,7 @@ export function AppsTab() {
         <Field label="Connect by slug" hint="For an app that is not in the list. Example: figma">
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="figma" className="h-11 font-mono text-base lg:h-9 lg:text-xs" />
-            <Button variant="outline" className="h-11 shrink-0 lg:h-8" disabled={!custom.trim() || busy === custom.trim().toLowerCase() || source === "none" || !enabled} onClick={() => void connect(custom)}>
+            <Button variant="outline" className="h-11 shrink-0 lg:h-8" disabled={!custom.trim() || busy === custom.trim().toLowerCase() || source === "none" || !enabled} onClick={() => void connect(custom, reserveExternalTab())}>
               <ExternalLink />Connect
             </Button>
           </div>
@@ -184,7 +211,7 @@ export function AppsTab() {
   );
 }
 
-function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string; apps: ComposioAppState[]; busy: string | null; canConnect: boolean; onConnect: (slug: string) => void }) {
+function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string; apps: ComposioAppState[]; busy: string | null; canConnect: boolean; onConnect: (slug: string, popup: Window | null) => void }) {
   if (apps.length === 0) return null;
   return (
     <div>
@@ -197,7 +224,7 @@ function AppGroup({ title, apps, busy, canConnect, onConnect }: { title: string;
               <button
                 type="button"
                 disabled={pending || !canConnect || app.connected}
-                onClick={() => onConnect(app.slug)}
+                onClick={() => onConnect(app.slug, reserveExternalTab())}
                 className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left active:bg-muted disabled:active:bg-transparent"
               >
                 {app.logo ? <img src={app.logo} alt="" loading="lazy" className="size-10 shrink-0 rounded-xl bg-white object-contain p-1" /> : <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-semibold text-muted-foreground">{app.name.slice(0, 1)}</span>}
