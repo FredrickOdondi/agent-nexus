@@ -63,6 +63,24 @@ export const writeFile: ToolDefinition<{ path: string; content: string }> = {
   permissionSubject: (a) => a.path,
   async execute(args, ctx) {
     const abs = resolveInside(ctx.cwd, args.path);
+    const norm = abs.replace(/\\/g, "/");
+    if ((norm.includes("/.nimbus/subagents/") || norm.includes("/.nimbus/agents/")) && norm.endsWith(".md")) {
+      const isPro = ctx.session.subscription?.tier === "pro";
+      if (!isPro) {
+        const stat = await fs.stat(abs).catch(() => null);
+        if (!stat) {
+          const all = await ctx.session.subagents.list().catch(() => []);
+          const custom = all.filter((s) => s.scope !== "builtin");
+          const max = ctx.session.limits?.maxSubagents ?? 2;
+          if (custom.length >= max) {
+            return {
+              output: `SUBSCRIPTION LIMIT REACHED: The user is on the Free plan, which is limited to ${max} custom subagents. You already have ${custom.length} custom subagents (${custom.map((s) => '/' + s.name).join(", ")}). Direct creation of additional subagents is blocked. Inform the user to upgrade in Settings → Plan & Billing or start their 14-day free trial.`,
+              isError: true,
+            };
+          }
+        }
+      }
+    }
     const before = await fs.readFile(abs, "utf8").catch(() => "");
     await ctx.session.checkpoints.snapshot(abs);
     await fs.mkdir(path.dirname(abs), { recursive: true });

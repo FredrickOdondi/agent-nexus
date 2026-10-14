@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bot, ChevronLeft, ChevronRight, Cpu, Info, Palette, Plug, Smartphone, UserRound } from "lucide-react";
+import { Bot, ChevronLeft, ChevronRight, Cpu, Info, Palette, Plug, Smartphone, Sparkles, UserRound } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -10,9 +10,11 @@ import { AppsTab } from "./tabs/AppsTab";
 import { AppearanceTab } from "./tabs/AppearanceTab";
 import { DevicesTab } from "./tabs/DevicesTab";
 import { ModelTab } from "./tabs/ModelTab";
+import { SubscriptionTab } from "./tabs/SubscriptionTab";
 
 const TABS = [
   { id: "account", label: "Account", icon: UserRound },
+  { id: "subscription", label: "Plan & Billing", icon: Sparkles },
   { id: "model", label: "Model", icon: Cpu },
   { id: "agent", label: "Agent & tools", icon: Bot },
   { id: "apps", label: "Apps", icon: Plug },
@@ -37,6 +39,7 @@ function SettingsPanel({ tab }: { tab: string }) {
   return (
     <>
       {tab === "account" && <AccountTab />}
+      {tab === "subscription" && <SubscriptionTab />}
       {tab === "model" && <ModelTab />}
       {tab === "agent" && <AgentTab />}
       {tab === "apps" && <AppsTab />}
@@ -54,8 +57,17 @@ export function SettingsDialog() {
   const close = useStore((s) => s.closeSettings);
   const openSettings = useStore((s) => s.openSettings);
   const showRoot = useStore((s) => s.showSettingsRoot);
+  const subscription = useStore((s) => s.subscription);
   const phone = useMediaQuery("(max-width: 1023px)");
   const current = TABS.find((t) => t.id === tab);
+
+  const isPro = subscription?.tier === "pro";
+  const isTrial = subscription?.status === "trialing";
+  const isLifetime = Boolean(
+    subscription?.billingInterval === "lifetime" ||
+    subscription?.planName?.toLowerCase().includes("lifetime") ||
+    subscription?.licenseKey?.toUpperCase().includes("LIFE")
+  );
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
@@ -80,7 +92,19 @@ export function SettingsDialog() {
                     <button type="button" onClick={() => openSettings(t.id)} className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left active:bg-muted">
                       <span className="flex size-10 items-center justify-center rounded-xl bg-muted text-foreground"><t.icon className="size-5" /></span>
                       <span className="text-[17px] font-medium">{t.label}</span>
-                      <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+                      {t.id === "subscription" && (
+                        <span className={cn(
+                          "ml-auto rounded-full px-2 py-0.5 text-xs font-bold uppercase",
+                          isLifetime
+                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+                            : isPro
+                            ? isTrial ? "bg-amber-500/20 text-amber-600 dark:text-amber-400" : "bg-primary/20 text-primary"
+                            : "bg-muted text-muted-foreground"
+                        )}>
+                          {isLifetime ? "Lifetime" : isPro ? (isTrial ? "Trial" : "Pro") : "Free"}
+                        </span>
+                      )}
+                      <ChevronRight className={cn("size-4 text-muted-foreground", t.id !== "subscription" && "ml-auto")} />
                     </button>
                   </li>
                 ))}
@@ -113,7 +137,20 @@ export function SettingsDialog() {
                       onClick={() => openSettings(t.id)}
                       className={cn("flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm whitespace-nowrap transition-colors", tab === t.id ? "bg-sidebar-accent font-medium text-sidebar-accent-foreground" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground")}
                     >
-                      <t.icon className="size-4" />{t.label}
+                      <t.icon className="size-4" />
+                      <span>{t.label}</span>
+                      {t.id === "subscription" && (
+                        <span className={cn(
+                          "ml-auto rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider",
+                          isLifetime
+                            ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold"
+                            : isPro
+                            ? isTrial ? "bg-amber-500/20 text-amber-600 dark:text-amber-400" : "bg-primary/20 text-primary"
+                            : "bg-muted-foreground/15 text-muted-foreground"
+                        )}>
+                          {isLifetime ? "Lifetime" : isPro ? (isTrial ? "Trial" : "Pro") : "Free"}
+                        </span>
+                      )}
                     </button>
                   </li>
                 ))}

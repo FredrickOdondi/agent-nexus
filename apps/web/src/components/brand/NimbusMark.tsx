@@ -4,6 +4,10 @@ import { cn } from "@/lib/utils";
 
 type MarkState = "idle" | "loading" | "static";
 type MarkTone = "brand" | "inverse";
+/** Three gradient stops: top-left, middle, bottom-right. */
+export type MarkPalette = readonly [string, string, string];
+
+const BRAND_PALETTE: MarkPalette = ["#8d7cff", "#6d5ef8", "#3ecfbf"];
 
 function useReducedMotion() {
   const [reduced, setReduced] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -21,11 +25,13 @@ export function NimbusMark({
   size = 28,
   state = "idle",
   tone = "brand",
+  palette = BRAND_PALETTE,
   className,
 }: {
   size?: number;
   state?: MarkState;
   tone?: MarkTone;
+  palette?: MarkPalette;
   className?: string;
 }) {
   const reduced = useReducedMotion();
@@ -45,9 +51,9 @@ export function NimbusMark({
     >
       <defs>
         <linearGradient id={gradientId} x1="10" y1="14" x2="54" y2="52" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#8d7cff" />
-          <stop offset="0.55" stopColor="#6d5ef8" />
-          <stop offset="1" stopColor="#3ecfbf" />
+          <stop offset="0" stopColor={palette[0]} />
+          <stop offset="0.55" stopColor={palette[1]} />
+          <stop offset="1" stopColor={palette[2]} />
         </linearGradient>
       </defs>
       <motion.g
@@ -98,7 +104,7 @@ export function NimbusMark({
           transition={{ duration: 2.6, repeat: Infinity, ease: "linear" }}
         >
           <circle cx="32" cy="11" r="2.15" fill="#fff" />
-          <circle cx="32" cy="11" r="1.15" fill="#3ecfbf" />
+          <circle cx="32" cy="11" r="1.15" fill={palette[2]} />
         </motion.g>
       )}
     </motion.svg>

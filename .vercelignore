@@ -1,0 +1,15 @@
+node_modules
+apps/*/node_modules
+packages/*/node_modules
+release
+apps/desktop/release
+apps/desktop/resources
+dist
+apps/server/dist
+apps/desktop/dist
+.git
+.env
+.env.*
+*.log
+binaries
+binaries/*

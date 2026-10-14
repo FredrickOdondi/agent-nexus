@@ -1,8 +1,11 @@
+import { promises as fs } from "node:fs";
 import type { IncomingMessage } from "node:http";
+import os from "node:os";
+import path from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { ClientMessage, Conversation, Device, Message, ServerMessage, SpaceSettings } from "@nimbus/shared";
 import { BUILTIN_TOOL_CATALOG, COMPOSIO_META_TOOLS, deriveTitle, newId, truncate } from "@nimbus/shared";
-import { createSkillCatalog } from "@nimbus/agent-core";
+import { createSkillCatalog, createSubagentCatalog } from "@nimbus/agent-core";
 import type { Db } from "./db.js";
 import type { SpaceRegistry } from "./registry.js";
 import { redactSettings } from "./space.js";
@@ -99,7 +102,10 @@ export class Hub {
       conn.device = device;
       this.db.touchDevice(device.id);
       if (msg.deviceName && msg.deviceName !== device.name) this.db.renameDevice(device.id, msg.deviceName);
-      const skills = await createSkillCatalog(rt.space.getSettings().workspacePath).list().catch(() => []);
+      const [skills, subagents] = await Promise.all([
+        createSkillCatalog(rt.space.getSettings().workspacePath).list().catch(() => []),
+        createSubagentCatalog(rt.space.getSettings().workspacePath, this.registry.dataDir).list().catch(() => []),
+      ]);
       const settings = rt.space.getSettings();
       const providerHosted = settings.provider.kind === "xai" && settings.provider.serverTools && Boolean(settings.provider.apiKey);
       const welcome: ServerMessage = {
@@ -109,6 +115,7 @@ export class Hub {
         seq: this.db.latestSeq(rt.space.spaceId),
         conversations: rt.space.listConversations(),
         settings: redactSettings(settings),
+        subscription: rt.space.getSubscription(),
         devices: rt.space.listDevices(),
         tools: [
           ...BUILTIN_TOOL_CATALOG.map((t) => ({
@@ -125,6 +132,7 @@ export class Hub {
             : []),
         ],
         skills,
+        subagents,
         pendingApprovals: rt.runs.pendingApprovals(),
         runs: rt.runs.statuses(),
       };
@@ -283,6 +291,81 @@ export class Hub {
         space.deviceDeleted(msg.deviceId);
         for (const c of this.conns) if (c.device?.id === msg.deviceId) c.ws.close(4002, "revoked");
         return ack();
+      }
+
+      case "subagent.upsert": {
+        const cleanName = msg.name.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/^-+|-+$/g, "");
+        if (!cleanName) throw new Error("Invalid subagent name");
+
+        // Check subagent limits for Freemium tier
+        const catalog = createSubagentCatalog(space.getSettings().workspacePath, this.registry.dataDir);
+        const existing = await catalog.load(cleanName).catch(() => null);
+        if (!existing) {
+          const currentList = await catalog.list().catch(() => []);
+          const customCount = currentList.filter((s) => s.scope !== "builtin").length;
+          const sub = space.getSubscription();
+          if (customCount >= sub.limits.maxSubagents) {
+            throw new Error(`The Free plan allows up to ${sub.limits.maxSubagents} custom subagents. Upgrade to Pro for unlimited subagents.`);
+          }
+        }
+
+        const scope = msg.scope ?? "local";
+        const dir = scope === "user"
+          ? path.join(os.homedir(), ".nimbus/subagents")
+          : path.join(space.getSettings().workspacePath, ".nimbus/subagents");
+        await fs.mkdir(dir, { recursive: true });
+        const filePath = path.join(dir, `${cleanName}.md`);
+        const lines: string[] = [
+          "---",
+          `name: ${cleanName}`,
+          `description: "${(msg.description || cleanName).replace(/"/g, '\\"')}"`,
+        ];
+        if (msg.avatar) {
+          lines.push(`avatar: ${msg.avatar}`);
+        }
+        if (msg.tools && msg.tools.length > 0) {
+          lines.push(`tools: ${msg.tools.join(", ")}`);
+        }
+        if (msg.model) {
+          lines.push(`model: ${msg.model}`);
+        }
+        lines.push("---", "", (msg.prompt || "").trim(), "");
+        await fs.writeFile(filePath, lines.join("\n"), "utf8");
+        const userDir = path.join(os.homedir(), ".nimbus/subagents");
+        await fs.mkdir(userDir, { recursive: true }).catch(() => {});
+        await fs.writeFile(path.join(userDir, `${cleanName}.md`), lines.join("\n"), "utf8").catch(() => {});
+        const subagents = await createSubagentCatalog(space.getSettings().workspacePath, this.registry.dataDir).list();
+        space.ephemeral({ type: "subagents.update", subagents });
+        return ack({ subagents });
+      }
+
+      case "subagent.delete": {
+        const cleanName = msg.name.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/^-+|-+$/g, "");
+        const catalog = createSubagentCatalog(space.getSettings().workspacePath, this.registry.dataDir);
+        const subagent = await catalog.load(cleanName);
+        if (!subagent) throw new Error(`Subagent '${cleanName}' not found`);
+        if (subagent.scope === "builtin" || !subagent.path) throw new Error(`Cannot delete built-in subagent '${cleanName}'`);
+        await fs.unlink(subagent.path).catch(() => {});
+        const userPath = path.join(os.homedir(), ".nimbus/subagents", `${cleanName}.md`);
+        await fs.unlink(userPath).catch(() => {});
+        const subagents = await catalog.list();
+        space.ephemeral({ type: "subagents.update", subagents });
+        return ack({ subagents });
+      }
+
+      case "subscription.start_trial": {
+        const sub = space.startTrial();
+        return ack({ subscription: sub });
+      }
+
+      case "subscription.activate_license": {
+        const sub = space.activateLicense(msg.licenseKey);
+        return ack({ subscription: sub });
+      }
+
+      case "subscription.reset": {
+        const sub = space.resetSubscription();
+        return ack({ subscription: sub });
       }
 
       default:

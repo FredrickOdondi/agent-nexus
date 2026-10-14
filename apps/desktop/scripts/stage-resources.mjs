@@ -4,6 +4,7 @@ import { deflateSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { INPUT_C, SCREEN_PS1 } from "../../../packages/agent-core/dist/tools/screen.js";
+import { SEE_M, seeCompileArgs } from "../../../packages/agent-core/dist/tools/screen-see.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -14,6 +15,7 @@ mkdirSync(buildDir, { recursive: true });
 
 writeFileSync(path.join(screenDir, "nimbus-screen.ps1"), SCREEN_PS1);
 writeFileSync(path.join(screenDir, "nimbus-input.c"), INPUT_C);
+writeFileSync(path.join(screenDir, "nimbus-see.m"), SEE_M);
 writeFileSync(path.join(buildDir, "icon.png"), appIcon(1024));
 
 const requested = process.argv.slice(2);
@@ -34,6 +36,21 @@ if (targets.includes("mac")) {
   }
   chmodSync(out, 0o755);
   console.log(`screen helper ${out}`);
+
+  const seeSrc = path.join(screenDir, "nimbus-see.m");
+  const seeOut = path.join(screenDir, "nimbus-see");
+  const seeFlags = seeCompileArgs(seeOut, seeSrc);
+  const seeUniversal = spawnSync("clang", ["-arch", "arm64", "-arch", "x86_64", ...seeFlags], { stdio: "inherit" });
+  if (seeUniversal.status !== 0) {
+    const seeNative = spawnSync("clang", seeFlags, { stdio: "inherit" });
+    if (seeNative.status !== 0) {
+      console.warn("clang could not build universal nimbus-see, native build also failed. It will compile on demand if needed.");
+    }
+  }
+  if (spawnSync("test", ["-f", seeOut]).status === 0) {
+    chmodSync(seeOut, 0o755);
+    console.log(`screen perception helper ${seeOut}`);
+  }
 }
 
 if (process.argv.includes("web-icons")) {

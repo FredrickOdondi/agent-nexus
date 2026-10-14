@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { Conversation, Device, Message, Platform, SpaceSettings } from "@nimbus/shared";
+import type { Conversation, Device, Message, Platform, SpaceSettings, SubscriptionInfo } from "@nimbus/shared";
 import type { PersistedEvent, SyncEvent } from "@nimbus/shared";
-import { newId } from "@nimbus/shared";
+import { DEFAULT_FREE_SUBSCRIPTION, normalizeSubscription, newId } from "@nimbus/shared";
 import { DEFAULT_MODELS } from "@nimbus/agent-core";
 
 const EVENT_RETENTION = 20_000;
@@ -49,6 +49,7 @@ export class Db {
       CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, space_id TEXT NOT NULL, at INTEGER NOT NULL, json TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS events_space ON events(space_id, seq);
       CREATE TABLE IF NOT EXISTS settings (space_id TEXT PRIMARY KEY, json TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS subscriptions (space_id TEXT PRIMARY KEY, json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS pairings (code TEXT PRIMARY KEY, space_id TEXT NOT NULL, expires_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS accounts (
         space_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, email TEXT, name TEXT, avatar TEXT
@@ -63,6 +64,11 @@ export class Db {
   createSpace(spaceId: string, name: string, workspacePath: string) {
     this.db.prepare("INSERT INTO spaces (id, name, created_at) VALUES (?, ?, ?)").run(spaceId, name.slice(0, 80), Date.now());
     this.db.prepare("INSERT INTO settings (space_id, json) VALUES (?, ?)").run(spaceId, JSON.stringify(DEFAULT_SETTINGS(workspacePath)));
+    this.db.prepare("INSERT INTO subscriptions (space_id, json) VALUES (?, ?)").run(spaceId, JSON.stringify(DEFAULT_FREE_SUBSCRIPTION));
+  }
+
+  hasSpace(id: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM spaces WHERE id = ?").get(id));
   }
 
   hasPrimaryDevice(spaceId: string): boolean {
@@ -174,6 +180,32 @@ export class Db {
 
   saveSettings(spaceId: string, settings: SpaceSettings) {
     this.db.prepare("INSERT INTO settings (space_id, json) VALUES (?, ?) ON CONFLICT(space_id) DO UPDATE SET json = excluded.json").run(spaceId, JSON.stringify(settings));
+  }
+
+  // ---- subscription & billing ---------------------------------------------
+
+  getSubscription(spaceId: string): SubscriptionInfo {
+    const r = this.db.prepare("SELECT json FROM subscriptions WHERE space_id = ?").get(spaceId) as { json: string } | undefined;
+    if (!r) {
+      const initial = { ...DEFAULT_FREE_SUBSCRIPTION };
+      this.saveSubscription(spaceId, initial);
+      return initial;
+    }
+    try {
+      const parsed = JSON.parse(r.json) as Partial<SubscriptionInfo>;
+      const current = normalizeSubscription(parsed);
+      if (parsed.status !== current.status || parsed.tier !== current.tier) {
+        this.saveSubscription(spaceId, current);
+      }
+      return current;
+    } catch {
+      return { ...DEFAULT_FREE_SUBSCRIPTION };
+    }
+  }
+
+  saveSubscription(spaceId: string, sub: SubscriptionInfo) {
+    this.db.prepare("INSERT INTO subscriptions (space_id, json) VALUES (?, ?) ON CONFLICT(space_id) DO UPDATE SET json = excluded.json")
+      .run(spaceId, JSON.stringify(sub));
   }
 
   // ---- conversations & messages -----------------------------------------

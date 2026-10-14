@@ -7,6 +7,8 @@ import type {
   RunStatus,
   SkillInfo,
   SpaceSettings,
+  SubagentInfo,
+  SubscriptionInfo,
   ToolInfo,
 } from "./types.js";
 
@@ -26,7 +28,8 @@ export type SyncEvent =
   | { type: "message.delete"; messageId: string; conversationId: string }
   | { type: "settings.update"; settings: SpaceSettings }
   | { type: "device.upsert"; device: Device }
-  | { type: "device.delete"; deviceId: string };
+  | { type: "device.delete"; deviceId: string }
+  | { type: "subscription.update"; subscription: SubscriptionInfo };
 
 export interface PersistedEvent {
   seq: number;
@@ -41,10 +44,11 @@ export type EphemeralEvent =
   | { type: "approval.request"; request: ApprovalRequest }
   | { type: "approval.resolved"; requestId: string }
   | { type: "presence"; devices: Device[] }
-  | { type: "toast"; level: "info" | "error" | "success"; text: string };
+  | { type: "toast"; level: "info" | "error" | "success"; text: string }
+  | { type: "subagents.update"; subagents: SubagentInfo[] };
 
 export type ServerMessage =
-  | { type: "welcome"; deviceId: string; spaceId: string; seq: number; conversations: Conversation[]; settings: SpaceSettings; devices: Device[]; tools: ToolInfo[]; skills: SkillInfo[]; pendingApprovals: ApprovalRequest[]; runs: RunStatus[] }
+  | { type: "welcome"; deviceId: string; spaceId: string; seq: number; conversations: Conversation[]; settings: SpaceSettings; subscription?: SubscriptionInfo; devices: Device[]; tools: ToolInfo[]; skills: SkillInfo[]; subagents?: SubagentInfo[]; pendingApprovals: ApprovalRequest[]; runs: RunStatus[] }
   | { type: "events"; events: PersistedEvent[] }
   | { type: "event"; event: PersistedEvent }
   | { type: "ephemeral"; event: EphemeralEvent }
@@ -67,6 +71,11 @@ export type ClientCommand =
   | { type: "device.rename"; deviceId: string; name: string }
   | { type: "device.revoke"; deviceId: string }
   | { type: "rewind"; conversationId: string; messageId: string }
+  | { type: "subagent.upsert"; name: string; description: string; prompt: string; tools?: string[]; model?: string; avatar?: string; scope?: "local" | "user" }
+  | { type: "subagent.delete"; name: string }
+  | { type: "subscription.start_trial" }
+  | { type: "subscription.activate_license"; licenseKey: string }
+  | { type: "subscription.reset" }
   | { type: "ping" };
 
 /** Envelope around a command. `requestId` correlates the ack and must not carry a domain id. */

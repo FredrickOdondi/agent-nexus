@@ -21,10 +21,14 @@
     "@nimbus/shared": "workspace:*",
     "fast-glob": "^3.3.3",
     "ignore": "^7.0.5",
-    "node-html-markdown": "^2.0.0"
+    "mammoth": "^1.13.0",
+    "node-html-markdown": "^2.0.0",
+    "pdf-parse": "^2.4.5",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",
+    "@types/pdf-parse": "^1.1.5",
     "typescript": "^5.9.3"
   }
 }

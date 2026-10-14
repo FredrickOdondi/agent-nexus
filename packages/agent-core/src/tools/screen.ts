@@ -1,7 +1,5 @@
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { constants } from "node:fs";
-import { promises as fs } from "node:fs";
+import { constants, promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -15,19 +13,27 @@ import {
   escapeSendKeysText,
   type ScreenFrame,
 } from "./screen-geom.js";
+import {
+  commandExists,
+  firstAvailable,
+  run,
+  ScreenError,
+  sleep,
+} from "./screen-proc.js";
+import { see, seeBin } from "./screen-see.js";
+import {
+  buildPerception,
+  getAxElements,
+  runOcr,
+  writeMarksFile,
+  type PerceptionResult,
+} from "./screen-perception.js";
 
 export type { ScreenFrame };
-export { mapToScreen };
+export { mapToScreen, ScreenError };
 
-const MAX_EDGE = 1280;
+const MAX_EDGE = 1920;
 const AFTER_ACTION_MS = 280;
-
-export class ScreenError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ScreenError";
-  }
-}
 
 export interface Shot {
   bytes: Buffer;
@@ -38,6 +44,13 @@ export interface Shot {
   screenHeight: number;
   originX: number;
   originY: number;
+  perception?: PerceptionResult;
+  isCrop?: boolean;
+}
+
+export interface CaptureOptions {
+  withPerception?: boolean;
+  crop?: { x: number; y: number; width: number; height: number };
 }
 
 export interface ClickTarget {
@@ -48,65 +61,28 @@ export interface ClickTarget {
 }
 
 let lastFrame: ScreenFrame | null = null;
+let lastPerception: PerceptionResult | null = null;
 
 export function currentFrame(): ScreenFrame | null {
   return lastFrame;
+}
+
+export function currentPerception(): PerceptionResult | null {
+  return lastPerception;
 }
 
 export function rememberFrame(frame: ScreenFrame) {
   lastFrame = frame;
 }
 
+export function rememberPerception(p: PerceptionResult | null) {
+  lastPerception = p;
+}
+
 /** Map model coordinates through the last screenshot. Without one, they are treated as screen pixels. */
 export function locate(x: number, y: number): { x: number; y: number; scaled: boolean } {
   if (!lastFrame) return { x: Math.round(x), y: Math.round(y), scaled: false };
   return { ...mapToScreen(x, y, lastFrame), scaled: true };
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function run(bin: string, args: string[], timeoutMs = 20_000): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new ScreenError(`${bin} timed out.`));
-    }, timeoutMs);
-    child.stdout.on("data", (d: Buffer) => { stdout += d.toString(); });
-    child.stderr.on("data", (d: Buffer) => { stderr += d.toString(); });
-    child.on("error", (e) => {
-      clearTimeout(timer);
-      reject(new ScreenError(`${bin} failed to start: ${e.message}`));
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      if (code === 0) resolve({ stdout, stderr });
-      else reject(new ScreenError((stderr || stdout || `${bin} exited ${code ?? "unknown"}`).trim().slice(0, 600)));
-    });
-  });
-}
-
-async function commandExists(name: string): Promise<boolean> {
-  const entries = (process.env.PATH ?? "").split(path.delimiter).filter(Boolean);
-  const suffixes = process.platform === "win32" ? ["", ".exe", ".cmd"] : [""];
-  for (const dir of entries) {
-    for (const suffix of suffixes) {
-      try {
-        await fs.access(path.join(dir, name + suffix), constants.X_OK);
-        return true;
-      } catch { /* keep looking */ }
-    }
-  }
-  return false;
-}
-
-async function firstAvailable(names: string[]): Promise<string | null> {
-  for (const name of names) if (await commandExists(name)) return name;
-  return null;
 }
 
 function frameFrom(shot: Pick<Shot, "imageWidth" | "imageHeight" | "screenWidth" | "screenHeight" | "originX" | "originY">): ScreenFrame {
@@ -120,7 +96,13 @@ function frameFrom(shot: Pick<Shot, "imageWidth" | "imageHeight" | "screenWidth"
   };
 }
 
-async function finishShot(file: string, screen: { width: number; height: number; originX: number; originY: number }, mime: Shot["mime"]): Promise<Shot> {
+async function finishShot(
+  file: string,
+  screen: { width: number; height: number; originX: number; originY: number },
+  mime: Shot["mime"],
+  perception?: PerceptionResult,
+  isCrop?: boolean,
+): Promise<Shot> {
   const bytes = await fs.readFile(file);
   const size = imageSize(bytes);
   if (!size || size.width < 1 || size.height < 1) throw new ScreenError("The screenshot file could not be read.");
@@ -133,29 +115,128 @@ async function finishShot(file: string, screen: { width: number; height: number;
     screenHeight: screen.height,
     originX: screen.originX,
     originY: screen.originY,
+    perception,
+    isCrop,
   };
-  rememberFrame(frameFrom(shot));
+  if (!isCrop) {
+    rememberFrame(frameFrom(shot));
+    rememberPerception(perception ?? null);
+  }
   return shot;
 }
 
-export async function captureScreen(dataDir: string): Promise<Shot> {
-  if (process.platform === "darwin") return shotMac();
-  if (process.platform === "win32") return shotWindows(dataDir);
-  return shotLinux();
+export async function captureScreen(dataDir: string, opts?: CaptureOptions): Promise<Shot> {
+  if (process.platform === "darwin") return shotMac(dataDir, opts);
+  if (process.platform === "win32") return shotWindows(dataDir, opts);
+  return shotLinux(dataDir, opts);
 }
 
-async function shotMac(): Promise<Shot> {
+async function getMacDisplayBounds(dataDir: string, fallbackWidth: number, fallbackHeight: number) {
+  try {
+    const out = await see(dataDir, ["bounds"]);
+    const [ox, oy, w, h] = out.trim().split(/\s+/).map(Number);
+    if (w && h) return { originX: ox || 0, originY: oy || 0, width: w, height: h };
+  } catch {
+    // fallback if see helper is unavailable
+  }
+  return { originX: 0, originY: 0, width: fallbackWidth, height: fallbackHeight };
+}
+
+async function shotMac(dataDir: string, opts?: CaptureOptions): Promise<Shot> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "nimbus-screen-"));
   const png = path.join(dir, "screen.png");
   const jpg = path.join(dir, "screen.jpg");
   try {
     await run("screencapture", ["-x", "-D", "1", png]);
     const raw = await fs.readFile(png);
-    const screen = pngSize(raw);
-    if (!screen) throw new ScreenError("screencapture did not write a PNG.");
-    if (screen.width > MAX_EDGE || screen.height > MAX_EDGE) await run("sips", ["-Z", String(MAX_EDGE), png]);
-    await run("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "60", png, "--out", jpg]);
-    return await finishShot(jpg, { width: screen.width, height: screen.height, originX: 0, originY: 0 }, "image/jpeg");
+    const rawSize = pngSize(raw);
+    if (!rawSize) throw new ScreenError("screencapture did not write a PNG.");
+
+    // Accurate display bounds in points (not raw Retina pixels)
+    const bounds = await getMacDisplayBounds(dataDir, rawSize.width, rawSize.height);
+
+    // Compute target dimensions: logical points up to MAX_EDGE (1920)
+    let targetW = bounds.width;
+    let targetH = bounds.height;
+    if (targetW > MAX_EDGE || targetH > MAX_EDGE) {
+      const scale = MAX_EDGE / Math.max(targetW, targetH);
+      targetW = Math.round(targetW * scale);
+      targetH = Math.round(targetH * scale);
+    }
+
+    const frame: ScreenFrame = {
+      imageWidth: targetW,
+      imageHeight: targetH,
+      screenWidth: bounds.width,
+      screenHeight: bounds.height,
+      originX: bounds.originX,
+      originY: bounds.originY,
+    };
+
+    let perception: PerceptionResult | undefined;
+    let marksFile: string | undefined;
+
+    if (opts?.withPerception) {
+      const [ax, ocr] = await Promise.all([
+        getAxElements(dataDir).catch(() => null),
+        runOcr(png, dataDir).catch(() => []),
+      ]);
+      perception = buildPerception(ax, ocr, frame);
+      if (perception.elements.length > 0) {
+        marksFile = await writeMarksFile(perception.elements);
+      }
+    }
+
+    const canSee = (await seeBin(dataDir)) !== null;
+
+    if (canSee) {
+      if (opts?.crop) {
+        // Map crop from image coordinates back to raw PNG pixels
+        const scaleX = rawSize.width / (lastFrame?.imageWidth || targetW);
+        const scaleY = rawSize.height / (lastFrame?.imageHeight || targetH);
+        const cropX = Math.round(opts.crop.x * scaleX);
+        const cropY = Math.round(opts.crop.y * scaleY);
+        const cropW = Math.round(opts.crop.width * scaleX);
+        const cropH = Math.round(opts.crop.height * scaleY);
+
+        await see(dataDir, [
+          "render",
+          png,
+          jpg,
+          String(opts.crop.width),
+          String(opts.crop.height),
+          "0.90",
+          String(cropX),
+          String(cropY),
+          String(cropW),
+          String(cropH),
+        ]);
+
+        return await finishShot(jpg, bounds, "image/jpeg", perception, true);
+      }
+
+      await see(dataDir, [
+        "render",
+        png,
+        jpg,
+        String(targetW),
+        String(targetH),
+        "0.85",
+        "0",
+        "0",
+        "0",
+        "0",
+        marksFile ?? "",
+      ]);
+      return await finishShot(jpg, bounds, "image/jpeg", perception, false);
+    }
+
+    // Fallback if see helper is not compiled
+    if (rawSize.width > MAX_EDGE || rawSize.height > MAX_EDGE) {
+      await run("sips", ["-Z", String(MAX_EDGE), png]);
+    }
+    await run("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "80", png, "--out", jpg]);
+    return await finishShot(jpg, bounds, "image/jpeg", perception, false);
   } catch (e) {
     if (e instanceof ScreenError && /could not create image|not permitted|illegal/i.test(e.message)) {
       throw new ScreenError("Screen recording is blocked. On macOS, open System Settings → Privacy & Security → Screen Recording and allow the app that runs Nimbus.");
@@ -166,7 +247,7 @@ async function shotMac(): Promise<Shot> {
   }
 }
 
-async function shotLinux(): Promise<Shot> {
+async function shotLinux(dataDir: string, opts?: CaptureOptions): Promise<Shot> {
   if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
     throw new ScreenError("This process has no screen. Start Nimbus on the computer you want to click.");
   }
@@ -188,8 +269,23 @@ async function shotLinux(): Promise<Shot> {
     const raw = await fs.readFile(png);
     const screen = pngSize(raw);
     if (!screen) throw new ScreenError("The screenshot tool did not write a PNG.");
+
+    let perception: PerceptionResult | undefined;
+    if (opts?.withPerception) {
+      const ocr = await runOcr(png, dataDir).catch(() => []);
+      const frame: ScreenFrame = {
+        imageWidth: screen.width,
+        imageHeight: screen.height,
+        screenWidth: screen.width,
+        screenHeight: screen.height,
+        originX: 0,
+        originY: 0,
+      };
+      perception = buildPerception(null, ocr, frame);
+    }
+
     const resized = await shrinkLinux(png, jpg);
-    return await finishShot(resized ? jpg : png, { width: screen.width, height: screen.height, originX: 0, originY: 0 }, resized ? "image/jpeg" : "image/png");
+    return await finishShot(resized ? jpg : png, { width: screen.width, height: screen.height, originX: 0, originY: 0 }, resized ? "image/jpeg" : "image/png", perception, false);
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -208,15 +304,15 @@ async function grabX11(png: string): Promise<void> {
 
 async function shrinkLinux(png: string, jpg: string): Promise<boolean> {
   if (await commandExists("magick")) {
-    await run("magick", [png, "-resize", `${MAX_EDGE}x${MAX_EDGE}>`, "-quality", "60", jpg]);
+    await run("magick", [png, "-resize", `${MAX_EDGE}x${MAX_EDGE}>`, "-quality", "80", jpg]);
     return true;
   }
   if (await commandExists("convert")) {
-    await run("convert", [png, "-resize", `${MAX_EDGE}x${MAX_EDGE}>`, "-quality", "60", jpg]);
+    await run("convert", [png, "-resize", `${MAX_EDGE}x${MAX_EDGE}>`, "-quality", "80", jpg]);
     return true;
   }
   if (await commandExists("ffmpeg")) {
-    await run("ffmpeg", ["-y", "-loglevel", "error", "-i", png, "-vf", `scale='min(${MAX_EDGE},iw)':-2`, "-q:v", "5", jpg]);
+    await run("ffmpeg", ["-y", "-loglevel", "error", "-i", png, "-vf", `scale='min(${MAX_EDGE},iw)':-2`, "-q:v", "3", jpg]);
     return true;
   }
   return false;
@@ -242,8 +338,10 @@ using System.Runtime.InteropServices;
 public static class NimbusWin {
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern void mouse_event(int dwFlags, int dx, int dy, int dwData, int dwExtraInfo);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
 }
 "@
+[NimbusWin]::SetProcessDPIAware() | Out-Null
 function Click-At([int]$x, [int]$y, [string]$button, [int]$times) {
   [NimbusWin]::SetCursorPos($x, $y) | Out-Null
   Start-Sleep -Milliseconds 30
@@ -263,8 +361,8 @@ switch ($Verb) {
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
     $edge = [Math]::Max($bmp.Width, $bmp.Height)
-    if ($edge -gt 1280) {
-      $scale = 1280 / $edge
+    if ($edge -gt 1920) {
+      $scale = 1920 / $edge
       $nw = [Math]::Max(1, [int]($bmp.Width * $scale))
       $nh = [Math]::Max(1, [int]($bmp.Height * $scale))
       $small = New-Object System.Drawing.Bitmap $nw, $nh
@@ -275,7 +373,7 @@ switch ($Verb) {
     }
     $codec = [System.Drawing.Imaging.ImageCodecInfo]::GetImageEncoders() | Where-Object { $_.MimeType -eq "image/jpeg" }
     $ep = New-Object System.Drawing.Imaging.EncoderParameters 1
-    $ep.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality, [long]60)
+    $ep.Param[0] = New-Object System.Drawing.Imaging.EncoderParameter ([System.Drawing.Imaging.Encoder]::Quality, [long]80)
     $bmp.Save($OutFile, $codec, $ep)
     Write-Output ("{0} {1} {2} {3}" -f $bounds.X, $bounds.Y, $bounds.Width, $bounds.Height)
   }
@@ -332,14 +430,14 @@ async function powershell(dataDir: string, args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-async function shotWindows(dataDir: string): Promise<Shot> {
+async function shotWindows(dataDir: string, opts?: CaptureOptions): Promise<Shot> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "nimbus-screen-"));
   const jpg = path.join(dir, "screen.jpg");
   try {
     const line = await powershell(dataDir, ["-Verb", "shot", "-OutFile", jpg]);
     const [ox, oy, w, h] = line.split(/\s+/).map((n) => Number(n));
     if (![ox, oy, w, h].every((n) => Number.isFinite(n)) || !w || !h) throw new ScreenError("Windows did not report the screen size.");
-    return await finishShot(jpg, { width: w, height: h, originX: ox, originY: oy }, "image/jpeg");
+    return await finishShot(jpg, { width: w, height: h, originX: ox, originY: oy }, "image/jpeg", undefined, false);
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -627,4 +725,3 @@ export async function performAction(action: ScreenAction): Promise<void> {
 export async function settle() {
   await sleep(AFTER_ACTION_MS);
 }
-

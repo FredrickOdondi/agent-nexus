@@ -1,3 +1,4 @@
+import "./polyfills.js";
 import type { Server } from "node:http";
 import { createAdaptorServer } from "@hono/node-server";
 import { ensureDirs, loadConfig, type ServerConfig } from "./config.js";
@@ -66,6 +67,7 @@ async function openPort(fetch: Parameters<typeof bind>[0], cfg: ServerConfig): P
 
 async function main() {
   const cfg = loadConfig();
+  process.env.NIMBUS_DATA_DIR = cfg.dataDir;
   await ensureDirs(cfg);
   const startedAt = Date.now();
   const db = new Db(cfg.dataDir);

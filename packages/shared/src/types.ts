@@ -249,6 +249,17 @@ export interface SkillInfo {
   scope: "local" | "repo" | "user";
 }
 
+export interface SubagentInfo {
+  name: string;
+  description: string;
+  path?: string;
+  scope?: "local" | "repo" | "user" | "builtin";
+  prompt?: string;
+  tools?: string[];
+  model?: string;
+  avatar?: string;
+}
+
 export interface ApprovalRequest {
   id: string;
   conversationId: string;
@@ -281,3 +292,108 @@ export interface HealthInfo {
   dataDir: string;
   lanUrls: string[];
 }
+
+export type SubscriptionTier = "free" | "pro";
+
+export type SubscriptionStatus = "free" | "trialing" | "active" | "past_due" | "canceled" | "expired";
+
+export type BillingInterval = "month" | "year" | "lifetime";
+
+export interface PlanLimits {
+  /** Maximum number of paired devices allowed in a space. */
+  maxDevices: number;
+  /** Maximum number of custom subagents allowed. */
+  maxSubagents: number;
+  /** Maximum custom MCP servers allowed. */
+  maxMcpServers: number;
+  /** Maximum active Composio apps connected. */
+  maxComposioApps: number;
+  /** Autonomous background watchers / monitors (`watch`, `notify`). */
+  backgroundWatchers: boolean;
+  /** Encrypted cross-network sync relay / cloud backup. */
+  cloudSync: boolean;
+  /** Priority community and technical support. */
+  prioritySupport: boolean;
+}
+
+export interface SubscriptionInfo {
+  tier: SubscriptionTier;
+  status: SubscriptionStatus;
+  planName: string;
+  billingInterval?: BillingInterval;
+  trialStartedAt?: number;
+  trialExpiresAt?: number;
+  currentPeriodEnd?: number;
+  cancelAtPeriodEnd?: boolean;
+  licenseKey?: string;
+  customerEmail?: string;
+  isTrialEligible: boolean;
+  limits: PlanLimits;
+}
+
+export const FREE_PLAN_LIMITS: PlanLimits = {
+  maxDevices: 2,
+  maxSubagents: 2,
+  maxMcpServers: 1,
+  maxComposioApps: 1,
+  backgroundWatchers: false,
+  cloudSync: false,
+  prioritySupport: false,
+};
+
+export const PRO_PLAN_LIMITS: PlanLimits = {
+  maxDevices: 999,
+  maxSubagents: 999,
+  maxMcpServers: 999,
+  maxComposioApps: 999,
+  backgroundWatchers: true,
+  cloudSync: true,
+  prioritySupport: true,
+};
+
+export const TRIAL_DURATION_DAYS = 14;
+export const TRIAL_DURATION_MS = TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000;
+
+export const DEFAULT_FREE_SUBSCRIPTION: SubscriptionInfo = {
+  tier: "free",
+  status: "free",
+  planName: "Nimbus Free",
+  isTrialEligible: true,
+  limits: FREE_PLAN_LIMITS,
+};
+
+/** Normalize subscription state: checks for trial expiry and ensures limits match tier. */
+export function normalizeSubscription(sub?: Partial<SubscriptionInfo> | null): SubscriptionInfo {
+  if (!sub) return { ...DEFAULT_FREE_SUBSCRIPTION };
+  const now = Date.now();
+  const rawStatus = sub.status ?? "free";
+
+  // Check if 14-day trial has elapsed
+  if (rawStatus === "trialing" && sub.trialExpiresAt && now > sub.trialExpiresAt) {
+    return {
+      ...sub,
+      tier: "free",
+      status: "expired",
+      planName: "Nimbus Free (Trial Expired)",
+      isTrialEligible: false,
+      limits: FREE_PLAN_LIMITS,
+    };
+  }
+
+  const isPro = sub.tier === "pro" && (rawStatus === "active" || rawStatus === "trialing");
+  return {
+    tier: isPro ? "pro" : "free",
+    status: rawStatus,
+    planName: sub.planName || (isPro ? "Nimbus Pro" : "Nimbus Free"),
+    billingInterval: sub.billingInterval,
+    trialStartedAt: sub.trialStartedAt,
+    trialExpiresAt: sub.trialExpiresAt,
+    currentPeriodEnd: sub.currentPeriodEnd,
+    cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    licenseKey: sub.licenseKey,
+    customerEmail: sub.customerEmail,
+    isTrialEligible: sub.isTrialEligible ?? (rawStatus === "free" && !sub.trialStartedAt),
+    limits: isPro ? PRO_PLAN_LIMITS : FREE_PLAN_LIMITS,
+  };
+}
+

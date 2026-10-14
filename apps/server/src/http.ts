@@ -6,9 +6,18 @@ import path from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import QRCode from "qrcode";
-import type { HealthInfo, PairingTicket, Platform } from "@nimbus/shared";
+import type { HealthInfo, PairingTicket, Platform, SubscriptionInfo } from "@nimbus/shared";
+import { FREE_PLAN_LIMITS, PRO_PLAN_LIMITS } from "@nimbus/shared";
 import { composioConnect, composioStatus } from "./composio-host.js";
 import { verifySupabaseAccessToken, type SupabaseAccount } from "./supabase-auth.js";
+import {
+  convertPlanPrice,
+  getUsdToKesRate,
+  initializePaystackTransaction,
+  PLAN_PRICING_USD,
+  verifyPaystackTransaction,
+  verifyPaystackWebhookSignature,
+} from "./paystack.js";
 import type { Db } from "./db.js";
 import type { ServerConfig } from "./config.js";
 import type { SpaceRegistry } from "./registry.js";
@@ -153,6 +162,15 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
     const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
     const dev = token ? db.deviceByToken(token) : null;
     if (!dev) return c.json({ error: "unauthorized" }, 401);
+
+    const sub = db.getSubscription(dev.spaceId);
+    const existingDevices = db.listDevices(dev.spaceId);
+    if (existingDevices.length >= sub.limits.maxDevices) {
+      return c.json({
+        error: `Device limit reached on the Free plan (${sub.limits.maxDevices} devices). Upgrade to Pro for unlimited multi-device sync.`
+      }, 403);
+    }
+
     const wifi = wifiHost(cfg);
     if (!wifi) {
       const error = cfg.lanBound === false
@@ -224,10 +242,251 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
     const conflict = db.bindAccount(spaceId, user);
     if (conflict) return c.json({ error: conflict }, 403);
     if (!db.claimPairing(code)) return c.json({ error: "That code is invalid or has expired. Generate a new one on the desktop." }, 400);
+
+    const sub = db.getSubscription(spaceId);
+    if (db.listDevices(spaceId).length >= sub.limits.maxDevices) {
+      return c.json({ error: `Device limit reached on the Free plan (${sub.limits.maxDevices} devices). Upgrade to Pro for unlimited multi-device sync.` }, 403);
+    }
+
     const token = randomBytes(32).toString("hex");
     const device = db.createDevice(spaceId, (body.deviceName ?? "Mobile").slice(0, 60), body.platform ?? "mobile", token);
     registry.get(spaceId).space.deviceUpserted(device);
     return c.json({ token, deviceId: device.id, spaceId });
+  });
+
+  /** Subscription & Freemium management */
+  app.get("/api/subscription", async (c) => {
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const space = registry.get(dev.spaceId).space;
+    const subscription = space.getSubscription();
+    return c.json({
+      subscription,
+      plans: [
+        {
+          id: "free",
+          name: "Nimbus Free",
+          price: 0,
+          interval: "forever",
+          description: "Bring your own models with full local-first privacy.",
+          features: [
+            "Bring your own models (Ollama, OpenAI, DeepSeek, xAI)",
+            "Local SQLite database & zero-knowledge data storage",
+            "Up to 2 connected devices (desktop + phone)",
+            "Up to 2 custom subagents",
+            "1 active connected app / MCP server",
+            "Full tool execution & memory support"
+          ],
+        },
+        {
+          id: "pro_monthly",
+          name: "Nimbus Pro",
+          price: PLAN_PRICING_USD.pro_monthly ?? 0.01,
+          interval: "month",
+          description: "Uncapped multi-device power and autonomous agent capabilities.",
+          popular: true,
+          features: [
+            "Everything in Free, plus:",
+            "Unlimited connected devices & cross-network sync",
+            "Unlimited custom subagents & skill orchestration",
+            "Unlimited MCP servers & connected apps",
+            "Autonomous background watch & notify monitors",
+            "Encrypted cloud backup & relay sync",
+            "Early access to new features & priority support"
+          ],
+        },
+        {
+          id: "pro_annual",
+          name: "Nimbus Pro Annual",
+          price: PLAN_PRICING_USD.pro_annual ?? 89,
+          interval: "year",
+          savings: "Save 20%",
+          description: "Annual subscription for power users and developers.",
+          features: [
+            "All Pro features included",
+            "Equivalent to $7.40 / month (save $19/yr)",
+            "14-day money-back guarantee"
+          ],
+        },
+        {
+          id: "pro_lifetime",
+          name: "Founder's Lifetime Pass",
+          price: PLAN_PRICING_USD.pro_lifetime ?? 129,
+          interval: "lifetime",
+          description: "Pay once, unlock Pro forever across all your devices.",
+          features: [
+            "All Pro features with lifetime updates",
+            "Zero recurring fees forever",
+            "Founder Discord role & direct dev feedback channel"
+          ],
+        }
+      ]
+    });
+  });
+
+  app.post("/api/subscription/trial", async (c) => {
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    try {
+      const space = registry.get(dev.spaceId).space;
+      const sub = space.startTrial();
+      return c.json({ ok: true, subscription: sub });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 400);
+    }
+  });
+
+  app.post("/api/subscription/activate", async (c) => {
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { licenseKey?: string };
+    const key = String(body.licenseKey ?? "").trim();
+    if (!key) return c.json({ error: "License key is required" }, 400);
+    try {
+      const space = registry.get(dev.spaceId).space;
+      const sub = space.activateLicense(key);
+      return c.json({ ok: true, subscription: sub });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 400);
+    }
+  });
+
+  app.get("/api/subscription/pricing", async (c) => {
+    const rate = getUsdToKesRate();
+    const plans = {
+      monthly: convertPlanPrice("pro_monthly"),
+      annual: convertPlanPrice("pro_annual"),
+      lifetime: convertPlanPrice("pro_lifetime"),
+    };
+    return c.json({
+      settlementCurrency: "KES",
+      exchangeRate: rate,
+      plans,
+    });
+  });
+
+  app.post("/api/subscription/checkout", async (c) => {
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { planId?: string; email?: string };
+    const planId = body.planId ?? "pro_monthly";
+
+    // Application-level conversion: Prices are presented in USD and converted to KES for processing
+    const pricing = convertPlanPrice(planId);
+
+    const account = db.accountBySpace(dev.spaceId);
+    const email = body.email || account?.email || `user-${dev.spaceId.slice(-6)}@nimbus.app`;
+
+    const origin = c.req.header("origin") || uiOrigin(cfg, "127.0.0.1");
+    const callbackUrl = `${origin}/#/settings/subscription?payment=success`;
+
+    try {
+      const paystack = await initializePaystackTransaction({
+        email,
+        amountInCents: pricing.kesSubunits,
+        currency: "KES",
+        spaceId: dev.spaceId,
+        planId,
+        callbackUrl,
+      });
+
+      return c.json({
+        ok: true,
+        authorizationUrl: paystack.authorizationUrl,
+        reference: paystack.reference,
+        accessCode: paystack.accessCode,
+        pricing,
+      });
+    } catch (e) {
+      console.error("[nimbus] paystack checkout init failed:", e);
+      return c.json({ error: (e as Error).message }, 500);
+    }
+  });
+
+  app.post("/api/subscription/verify", async (c) => {
+    const dev = authed(c.req.header("authorization"));
+    if (!dev) return c.json({ error: "unauthorized" }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { reference?: string };
+    const reference = String(body.reference ?? "").trim();
+    if (!reference) return c.json({ error: "Reference is required" }, 400);
+
+    try {
+      const verified = await verifyPaystackTransaction(reference);
+      if (!verified.success) {
+        return c.json({ error: "Payment was not successful or could not be verified." }, 400);
+      }
+
+      const space = registry.get(dev.spaceId).space;
+      const planId = verified.planId || "pro_monthly";
+      const isLifetime = planId.includes("life");
+      const isAnnual = planId.includes("annual") || planId.includes("year");
+
+      const sub: SubscriptionInfo = {
+        tier: "pro",
+        status: "active",
+        planName: isLifetime ? "Founder's Lifetime Pass" : isAnnual ? "Nimbus Pro (Annual)" : "Nimbus Pro",
+        billingInterval: isLifetime ? "lifetime" : isAnnual ? "year" : "month",
+        licenseKey: isLifetime ? `PSTK-LIFE-${reference.slice(-8).toUpperCase()}` : `PSTK-${reference.slice(-8).toUpperCase()}`,
+        customerEmail: verified.customerEmail,
+        isTrialEligible: false,
+        limits: PRO_PLAN_LIMITS,
+      };
+
+      space.saveSubscription(sub);
+      return c.json({ ok: true, subscription: sub });
+    } catch (e) {
+      return c.json({ error: (e as Error).message }, 500);
+    }
+  });
+
+  app.post("/api/subscription/webhook", async (c) => {
+    const rawBody = await c.req.text().catch(() => "");
+    const signature = c.req.header("x-paystack-signature");
+
+    if (signature && !verifyPaystackWebhookSignature(rawBody, signature)) {
+      return c.json({ error: "Invalid signature" }, 401);
+    }
+
+    let payload: any = {};
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      return c.json({ error: "Invalid JSON" }, 400);
+    }
+
+    const event = String(payload.event || payload.type || "");
+    const data = payload.data || {};
+    const spaceId = data.metadata?.spaceId || data.metadata?.space_id;
+
+    if (spaceId && db.hasSpace(spaceId)) {
+      const space = registry.get(spaceId).space;
+      if (event === "charge.success") {
+        const planId = String(data.metadata?.planId || "pro_monthly");
+        const isLifetime = planId.includes("life");
+        const isAnnual = planId.includes("annual") || planId.includes("year");
+
+        space.saveSubscription({
+          tier: "pro",
+          status: "active",
+          planName: isLifetime ? "Founder's Lifetime Pass" : isAnnual ? "Nimbus Pro (Annual)" : "Nimbus Pro",
+          billingInterval: isLifetime ? "lifetime" : isAnnual ? "year" : "month",
+          licenseKey: isLifetime ? `PSTK-LIFE-${String(data.reference || "").slice(-8).toUpperCase()}` : `PSTK-${String(data.reference || "").slice(-8).toUpperCase()}`,
+          customerEmail: data.customer?.email,
+          isTrialEligible: false,
+          limits: PRO_PLAN_LIMITS,
+        });
+      } else if (event.includes("subscription.disable") || event.includes("failed")) {
+        space.saveSubscription({
+          tier: "free",
+          status: "canceled",
+          planName: "Nimbus Free",
+          isTrialEligible: false,
+          limits: FREE_PLAN_LIMITS,
+        });
+      }
+    }
+
+    return c.json({ received: true });
   });
 
   /** Static web client (production). */

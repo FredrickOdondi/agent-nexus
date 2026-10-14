@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import type { ApprovalRequest, Conversation, Message, Part, QuestionOption, RunStatus, TodoItem } from "@nimbus/shared";
 import { deriveTitle, messageText, newId, truncate } from "@nimbus/shared";
-import { AgentRunner, McpManager, type ApprovalAnswer, type ApprovalPrompt, type RunSink } from "@nimbus/agent-core";
+import { AgentRunner, McpManager, createSubagentCatalog, type ApprovalAnswer, type ApprovalPrompt, type RunSink } from "@nimbus/agent-core";
 import { rememberComposioSession, composioRuntime } from "./composio-host.js";
 import type { SpaceService } from "./space.js";
 
@@ -184,7 +184,17 @@ export class RunManager {
       },
       setTodos: (todos: TodoItem[]) => this.space.db.saveTodos(conversation.id, todos),
       setUsage: (usage) => { message.usage = usage; dirty = true; },
+      onSubagentsChanged: () => { void broadcastSubagents(); },
       log: (level, msg, extra) => this.log(level, msg, extra),
+    };
+
+    const broadcastSubagents = async () => {
+      try {
+        const subagents = await createSubagentCatalog(cwd, this.dataDir).list();
+        this.space.ephemeral({ type: "subagents.update", subagents });
+      } catch (err) {
+        this.log("warn", "Failed to broadcast subagents update", err);
+      }
     };
 
     const allow = this.sessionAllow.get(conversation.id) ?? new Set<string>();
@@ -212,6 +222,7 @@ export class RunManager {
         mcp: this.mcp,
         sessionAllow: allow,
         onComposioSession: (sessionId) => rememberComposioSession(this.space, sessionId),
+        subscription: this.space.getSubscription(),
       },
       sink,
     );
@@ -231,6 +242,7 @@ export class RunManager {
       persist(true);
       this.runs.delete(conversation.id);
       this.space.ephemeral({ type: "run.status", status: { conversationId: conversation.id, state: "idle" } });
+      void broadcastSubagents();
 
       const conv = this.space.getConversation(conversation.id);
       if (conv) {

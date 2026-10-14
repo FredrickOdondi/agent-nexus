@@ -7,6 +7,7 @@ import { MobileShell } from "@/components/layout/MobileShell";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Thread } from "@/components/chat/Thread";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { UpgradeModal } from "@/components/settings/UpgradeModal";
 import { LinkDevice } from "@/components/onboarding/LinkDevice";
 import { NimbusLoader } from "@/components/brand/NimbusMark";
 import { SignIn } from "@/components/onboarding/SignIn";
@@ -17,6 +18,7 @@ import { useStore } from "@/lib/store";
 import { supabaseAccessToken } from "@/lib/supabase";
 import { isElectron, isMac, isStandalonePwa } from "@/lib/platform";
 import { cn } from "@/lib/utils";
+import { LandingPage } from "@/components/landing/LandingPage";
 
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
@@ -47,11 +49,28 @@ export default function App() {
   const init = useStore((s) => s.init);
   const signOut = useStore((s) => s.signOut);
 
+  const [showLanding, setShowLanding] = useState(() => {
+    if (isElectron) return false;
+    const h = typeof window !== "undefined" ? window.location.hash : "";
+    if (h.startsWith("#/pair/") || h.startsWith("#/app") || h.startsWith("#/signin")) return false;
+    return true;
+  });
+
   useEffect(() => {
-    const onHash = () => setPairCode(readPairCode());
+    const onHash = () => {
+      const h = window.location.hash;
+      setPairCode(readPairCode());
+      if (h.startsWith("#/pair/") || h.startsWith("#/app") || h.startsWith("#/signin")) {
+        setShowLanding(false);
+      } else if (h.startsWith("#/download") || h.startsWith("#/landing") || h === "" || h === "#" || h === "#/") {
+        if (!isElectron && !session) {
+          setShowLanding(true);
+        }
+      }
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
-  }, []);
+  }, [session]);
 
   useEffect(() => {
     if (!userId) {
@@ -157,6 +176,15 @@ export default function App() {
     setPairCode(undefined);
     setLinked(true);
   };
+
+  if (showLanding) {
+    return (
+      <TooltipProvider delay={300}>
+        <LandingPage onLaunchApp={() => setShowLanding(false)} />
+        <Toaster position="top-center" richColors closeButton />
+      </TooltipProvider>
+    );
+  }
 
   return (
     <TooltipProvider delay={300}>
@@ -282,6 +310,7 @@ function Shell() {
       <>
         <MobileShell />
         <SettingsDialog />
+        <UpgradeModal />
       </>
     );
   }
@@ -303,6 +332,7 @@ function Shell() {
         <Thread />
       </main>
       <SettingsDialog />
+      <UpgradeModal />
     </div>
   );
 }

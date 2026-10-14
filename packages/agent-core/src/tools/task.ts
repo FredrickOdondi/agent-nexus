@@ -22,7 +22,10 @@ export const taskTool: ToolDefinition<TaskArgs> = {
     properties: {
       description: { type: "string", description: "3-6 word summary shown in the UI." },
       prompt: { type: "string", description: "Full instructions for the subagent, including what to return." },
-      subagent_type: { type: "string", enum: [...SUBAGENT_TYPES] },
+      subagent_type: {
+        type: "string",
+        description: `Subagent type: built-in (${SUBAGENT_TYPES.join(", ")}) or any custom subagent from subagent_manage list.`,
+      },
       run_in_background: { type: "boolean" },
     },
     required: ["description", "prompt", "subagent_type"],

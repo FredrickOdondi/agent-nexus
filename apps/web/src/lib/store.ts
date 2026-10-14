@@ -11,7 +11,9 @@ import type {
   RunStatus,
   ServerMessage,
   SkillInfo,
+  SubagentInfo,
   SpaceSettings,
+  SubscriptionInfo,
   ToolInfo,
 } from "@nimbus/shared";
 import { newId } from "@nimbus/shared";
@@ -33,6 +35,8 @@ interface UiState {
   settingsAtRoot: boolean;
   selectedId: string | null;
   draftMode: Conversation["mode"];
+  upgradeModalOpen: boolean;
+  upgradeFeatureHint: string | null;
 }
 
 interface State extends UiState {
@@ -47,9 +51,11 @@ interface State extends UiState {
   runs: Record<string, RunStatus>;
   approvals: ApprovalRequest[];
   settings: SpaceSettings | null;
+  subscription: SubscriptionInfo | null;
   devices: Device[];
   tools: ToolInfo[];
   skills: SkillInfo[];
+  subagents: SubagentInfo[];
 
   init(): Promise<void>;
   send(cmd: ClientCommand): Promise<unknown>;
@@ -61,9 +67,16 @@ interface State extends UiState {
   openSettings(tab?: string): void;
   showSettingsRoot(): void;
   closeSettings(): void;
+  openUpgradeModal(hint?: string): void;
+  closeUpgradeModal(): void;
+  startTrial(): Promise<void>;
+  activateLicense(key: string): Promise<void>;
+  resetSubscription(): Promise<void>;
   setDraftMode(mode: Conversation["mode"]): void;
   resetLocal(): void;
   signOut(): Promise<void>;
+  upsertSubagent(data: { name: string; description: string; prompt: string; tools?: string[]; model?: string; avatar?: string; scope?: "local" | "user" }): Promise<void>;
+  deleteSubagent(name: string): Promise<void>;
 }
 
 let client: SyncClient | null = null;
@@ -87,6 +100,8 @@ export const useStore = create<State>((set, get) => ({
   settingsAtRoot: true,
   selectedId: null,
   draftMode: "agent",
+  upgradeModalOpen: false,
+  upgradeFeatureHint: null,
   connection: "connecting",
   deviceId: null,
   spaceId: null,
@@ -98,9 +113,11 @@ export const useStore = create<State>((set, get) => ({
   runs: {},
   approvals: [],
   settings: null,
+  subscription: null,
   devices: [],
   tools: [],
   skills: [],
+  subagents: [],
 
   async init() {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -191,6 +208,48 @@ export const useStore = create<State>((set, get) => ({
   openSettings: (tab) => set({ settingsOpen: true, settingsTab: tab ?? "model", settingsAtRoot: tab == null }),
   showSettingsRoot: () => set({ settingsAtRoot: true }),
   closeSettings: () => set({ settingsOpen: false }),
+  openUpgradeModal: (hint) => set({ upgradeModalOpen: true, upgradeFeatureHint: hint ?? null }),
+  closeUpgradeModal: () => set({ upgradeModalOpen: false, upgradeFeatureHint: null }),
+
+  async startTrial() {
+    try {
+      const res = (await get().send({ type: "subscription.start_trial" })) as { subscription?: SubscriptionInfo };
+      if (res?.subscription) {
+        set({ subscription: res.subscription });
+        toast.success("14-day Pro trial activated! Enjoy unlimited features.");
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+      throw e;
+    }
+  },
+
+  async activateLicense(licenseKey: string) {
+    try {
+      const res = (await get().send({ type: "subscription.activate_license", licenseKey })) as { subscription?: SubscriptionInfo };
+      if (res?.subscription) {
+        set({ subscription: res.subscription });
+        toast.success("License activated! Welcome to Nimbus Pro.");
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+      throw e;
+    }
+  },
+
+  async resetSubscription() {
+    try {
+      const res = (await get().send({ type: "subscription.reset" })) as { subscription?: SubscriptionInfo };
+      if (res?.subscription) {
+        set({ subscription: res.subscription });
+        toast.info("Plan reset to Free tier.");
+      }
+    } catch (e) {
+      toast.error((e as Error).message);
+      throw e;
+    }
+  },
+
   setDraftMode: (mode) => set({ draftMode: mode }),
 
   resetLocal() {
@@ -225,6 +284,22 @@ export const useStore = create<State>((set, get) => ({
     location.hash = "";
     location.reload();
   },
+
+  async upsertSubagent(data) {
+    const res = await get().send({
+      type: "subagent.upsert",
+      ...data,
+    }) as { subagents?: SubagentInfo[] } | undefined;
+    if (res?.subagents) set({ subagents: res.subagents });
+  },
+
+  async deleteSubagent(name) {
+    const res = await get().send({
+      type: "subagent.delete",
+      name,
+    }) as { subagents?: SubagentInfo[] } | undefined;
+    if (res?.subagents) set({ subagents: res.subagents });
+  },
 }));
 
 type Set = (fn: Partial<State> | ((s: State) => Partial<State>)) => void;
@@ -240,9 +315,11 @@ function handleServerMessage(msg: ServerMessage, set: Set, get: Get) {
         spaceId: msg.spaceId,
         conversations: sortConversations(msg.conversations),
         settings: msg.settings,
+        subscription: msg.subscription ?? null,
         devices: msg.devices,
         tools: msg.tools,
         skills: msg.skills,
+        subagents: msg.subagents ?? [],
         approvals: msg.pendingApprovals,
         runs,
         loaded: {},
@@ -316,6 +393,9 @@ function applyPersisted(e: PersistedEvent, set: Set, get: Get) {
     case "settings.update":
       set({ settings: ev.settings });
       return;
+    case "subscription.update":
+      set({ subscription: ev.subscription });
+      return;
     case "device.upsert":
       set((s) => ({ devices: upsertById(s.devices, { ...ev.device, online: s.devices.find((d) => d.id === ev.device.id)?.online }) }));
       return;
@@ -377,6 +457,9 @@ function applyEphemeral(ev: EphemeralEvent, set: Set, get: Get) {
       return;
     case "presence":
       set({ devices: ev.devices });
+      return;
+    case "subagents.update":
+      set({ subagents: ev.subagents });
       return;
     case "toast":
       (ev.level === "error" ? toast.error : ev.level === "success" ? toast.success : toast)(ev.text);

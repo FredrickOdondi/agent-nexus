@@ -21,6 +21,25 @@ export function resolveProviderApiKey(settings: ProviderSettings): string | unde
   return undefined;
 }
 
+/**
+ * Whether the configured model can accept images. The `computer` tool depends
+ * on this: without vision, a screenshot is captured but the model cannot aim
+ * clicks from it, and the image surfaces as an unsupported/undecodable part.
+ *
+ * DeepSeek's Pro line is text-only; only the Flash line accepts images
+ * (`deepseek-flash`, or the retired `deepseek-v4-flash-vision-exp` alias).
+ * Grok models are multimodal. OpenAI-compatible endpoints and the offline
+ * demo are assumed vision-capable.
+ */
+export function supportsVision(settings: ProviderSettings): boolean {
+  if (settings.kind === "xai") return true;
+  if (settings.kind === "deepseek") {
+    const model = settings.model.toLowerCase();
+    return model.includes("flash") || model.includes("vision") || model.includes("vl");
+  }
+  return true;
+}
+
 export function createProvider(settings: ProviderSettings): LLMProvider {
   const apiKey = resolveProviderApiKey(settings);
   if (settings.kind === "mock" || !apiKey && (settings.kind === "xai" || settings.kind === "deepseek")) return new MockProvider();

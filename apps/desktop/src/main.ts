@@ -120,9 +120,11 @@ function screenHelperEnv(): Record<string, string> {
   if (!app.isPackaged) return {};
   const dir = path.join(process.resourcesPath, "screen");
   const helper = path.join(dir, "nimbus-input");
+  const seeHelper = path.join(dir, "nimbus-see");
   const ps1 = path.join(dir, "nimbus-screen.ps1");
   return {
     ...(existsSync(helper) ? { NIMBUS_INPUT_BIN: helper } : {}),
+    ...(existsSync(seeHelper) ? { NIMBUS_SEE_BIN: seeHelper } : {}),
     ...(existsSync(ps1) ? { NIMBUS_SCREEN_PS1: ps1 } : {}),
   };
 }

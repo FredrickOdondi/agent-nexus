@@ -59,3 +59,40 @@ test("key chords stay inside each platform's vocabulary", () => {
   assert.equal(macKeyScript(toMacKey("escape")), "tell application \"System Events\" to key code 53");
   assert.throws(() => toXdotoolKey("ctrl+not-a-key"));
 });
+
+test("perception builder merges AX tree and OCR into numbered targets", async () => {
+  const { buildPerception, formatElementsForPrompt } = await import("./screen-perception.js");
+  const { SEE_M } = await import("./screen-see.js");
+  assert.match(SEE_M, /VNRecognizeTextRequest/);
+  assert.match(SEE_M, /AXUIElementCopyAttributeValue/);
+
+  const frame = { imageWidth: 1920, imageHeight: 1080, screenWidth: 1920, screenHeight: 1080, originX: 0, originY: 0 };
+  const axDump = {
+    app: "TestApp",
+    pid: 1234,
+    elements: [
+      { role: "AXButton", label: "Save File", enabled: true, focused: false, x: 100, y: 200, w: 80, h: 30 },
+      { role: "AXTextField", placeholder: "Search...", enabled: true, focused: true, x: 300, y: 50, w: 200, h: 25 },
+    ],
+  };
+  const ocrList = [
+    { text: "Save File", confidence: 0.99, x: 0.052, y: 0.185, w: 0.041, h: 0.027 }, // overlaps button
+    { text: "Unlabeled heading", confidence: 0.95, x: 0.4, y: 0.3, w: 0.1, h: 0.03 }, // new text
+  ];
+
+  const p = buildPerception(axDump, ocrList, frame);
+  assert.equal(p.app, "TestApp");
+  assert.equal(p.elements.length, 3);
+  assert.equal(p.elements[0]!.id, 1);
+  assert.equal(p.elements[0]!.label, "Save File");
+  assert.equal(p.elements[1]!.id, 2);
+  assert.equal(p.elements[1]!.label, "Search...");
+  assert.equal(p.elements[2]!.id, 3);
+  assert.equal(p.elements[2]!.label, "Unlabeled heading");
+
+  const promptText = formatElementsForPrompt(p);
+  assert.match(promptText, /Active window: TestApp/);
+  assert.match(promptText, /\[1\] button "Save File"/);
+  assert.match(promptText, /\[2\] textfield "Search\.\.\."/);
+  assert.match(promptText, /\[3\] text "Unlabeled heading"/);
+});

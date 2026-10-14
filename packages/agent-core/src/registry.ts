@@ -1,13 +1,22 @@
 import type { ToolInfo } from "@nimbus/shared";
 import type { ToolDefinition } from "./types.js";
+import { appsTool } from "./tools/apps.js";
+import { applescriptTool } from "./tools/applescript.js";
+import { browserTool } from "./tools/browser.js";
+import { clipboardTool } from "./tools/clipboard.js";
 import { computerTool } from "./tools/computer.js";
+import { docParseTool } from "./tools/doc-parse.js";
 import { globTool, listDir, readFile, searchReplace, writeFile } from "./tools/files.js";
 import { grep } from "./tools/grep.js";
 import { imageGen } from "./tools/image.js";
+import { notifyTool } from "./tools/notify.js";
+import { scheduleTool } from "./tools/schedule.js";
 import { getTaskOutput, taskTool } from "./tools/task.js";
 import { runTerminalCmd } from "./tools/terminal.js";
+import { fileWatchTool } from "./tools/watch.js";
 import { webFetch, webSearch } from "./tools/web.js";
 import { askUserQuestion, enterPlanMode, exitPlanMode, memoryTool, skillTool, todoWrite } from "./tools/workflow.js";
+import { subagentManageTool } from "./tools/subagent.js";
 
 export const BUILTIN_TOOLS: ToolDefinition<any>[] = [
   runTerminalCmd,
@@ -29,6 +38,15 @@ export const BUILTIN_TOOLS: ToolDefinition<any>[] = [
   skillTool,
   imageGen,
   computerTool,
+  appsTool,
+  clipboardTool,
+  applescriptTool,
+  notifyTool,
+  browserTool,
+  scheduleTool,
+  fileWatchTool,
+  docParseTool,
+  subagentManageTool,
 ];
 
 export interface RegistryOptions {
@@ -42,7 +60,7 @@ export interface RegistryOptions {
   /** Provider executes web search itself → drop the local implementation. */
   providerHostsWebSearch: boolean;
   /** Subagent profiles get a trimmed surface. */
-  profile?: "main" | "explore" | "general" | "plan" | "review";
+  profile?: string;
 }
 
 /**
@@ -78,6 +96,12 @@ export class ToolRegistry {
     if (opts.profile && opts.profile !== "main") {
       drop.add("memory");
       drop.add("computer");
+      drop.add("apps");
+      drop.add("clipboard");
+      drop.add("applescript");
+      drop.add("browser");
+      drop.add("notify");
+      drop.add("subagent_manage");
     }
 
     tools = tools.filter((t) => !drop.has(t.id));

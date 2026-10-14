@@ -1,10 +1,10 @@
 import os from "node:os";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Citation, Message, Part, ProviderSettings, QuestionOption, TodoItem, ToolCallPart, ToolDisplay } from "@nimbus/shared";
+import type { Citation, Message, Part, ProviderSettings, QuestionOption, SubscriptionInfo, TodoItem, ToolCallPart, ToolDisplay } from "@nimbus/shared";
 import { newId } from "@nimbus/shared";
 import { composioToolDefinitions } from "./composio.js";
-import { createMemoryStore, createSkillCatalog, loadProjectRules } from "./discovery.js";
+import { createMemoryStore, createSkillCatalog, createSubagentCatalog, loadProjectRules } from "./discovery.js";
 import { discoverHooks, runHooks } from "./hooks.js";
 import { McpManager } from "./mcp.js";
 import { evaluatePermission } from "./permissions.js";
@@ -26,7 +26,7 @@ import type {
 } from "./types.js";
 import { clampText, exists } from "./util/fs.js";
 
-export type Profile = "main" | "explore" | "general" | "plan" | "review";
+export type Profile = "main" | "explore" | "general" | "plan" | "review" | string;
 
 /** Host-provided UI/persistence bridge for one run. */
 export interface RunSink {
@@ -41,6 +41,7 @@ export interface RunSink {
   setTodos(todos: TodoItem[]): void;
   setUsage(usage: { inputTokens: number; outputTokens: number }): void;
   log(level: "info" | "warn" | "error", msg: string, extra?: unknown): void;
+  onSubagentsChanged?: () => void | Promise<void>;
 }
 
 export interface RunOptions {
@@ -69,6 +70,7 @@ export interface RunOptions {
   mcp?: McpManager;
   /** Shared "allow always" grants for this conversation. */
   sessionAllow?: Set<string>;
+  subscription?: SubscriptionInfo;
 }
 
 export interface RunOutcome {
@@ -114,6 +116,7 @@ export class AgentRunner {
   private buildServices(): SessionServices {
     const memory = createMemoryStore(this.opts.dataDir, this.opts.cwd);
     const skills = createSkillCatalog(this.opts.cwd);
+    const subagents = createSubagentCatalog(this.opts.cwd, this.opts.dataDir);
     const checkpointDir = path.join(this.opts.dataDir, "checkpoints", this.opts.conversationId);
     const self = this;
     return {
@@ -123,6 +126,7 @@ export class AgentRunner {
       getTodos: () => this.todos,
       memory,
       skills,
+      subagents,
       processes: this.processes,
       tasks: this.taskManager(),
       planMode: {
@@ -137,6 +141,8 @@ export class AgentRunner {
       },
       log: this.sink.log,
       settings: { webSearchEnabled: this.opts.settings.webSearchEnabled, subagentsEnabled: this.opts.settings.subagentsEnabled, provider: this.opts.provider },
+      subscription: this.opts.subscription,
+      limits: this.opts.subscription?.limits,
       checkpoints: {
         async snapshot(p: string) {
           if (!(await exists(p))) return;
@@ -145,6 +151,7 @@ export class AgentRunner {
           await fs.copyFile(p, target).catch(() => {});
         },
       },
+      onSubagentsChanged: () => this.sink.onSubagentsChanged?.(),
     };
   }
 
@@ -170,6 +177,9 @@ export class AgentRunner {
   }
 
   private async runSubagent(rec: TaskRecord, prompt: string, profile: Profile) {
+    const services = this.buildServices();
+    const subagentDef = await services.subagents.load(profile).catch(() => null);
+    const isCustom = Boolean(subagentDef && subagentDef.scope !== "builtin");
     const child = new AgentRunner(
       {
         ...this.opts,
@@ -177,7 +187,8 @@ export class AgentRunner {
         mode: "agent",
         history: [],
         maxTurns: 30,
-        permission: profile === "general" ? this.opts.permission : { mode: "read_only", allow: [], deny: [] },
+        provider: subagentDef?.model ? { ...this.opts.provider, model: subagentDef.model } : this.opts.provider,
+        permission: profile === "general" || isCustom ? this.opts.permission : { mode: "read_only", allow: [], deny: [] },
         settings: { ...this.opts.settings, subagentsEnabled: false },
         sessionAllow: this.sessionAllow,
       },
@@ -238,16 +249,24 @@ export class AgentRunner {
     }
     this.hooks = await discoverHooks(this.opts.cwd);
     const services = this.buildServices();
-    const [rules, skills, memGlobal, memWorkspace] = await Promise.all([
+    const [rules, skills, memGlobal, memWorkspace, subagentDef, allSubagents] = await Promise.all([
       loadProjectRules(this.opts.cwd),
       services.skills.list(),
       this.opts.settings.memoryEnabled ? services.memory.read("global") : Promise.resolve(""),
       this.opts.settings.memoryEnabled ? services.memory.read("workspace") : Promise.resolve(""),
+      profile !== "main" ? services.subagents.load(profile).catch(() => null) : Promise.resolve(null),
+      services.subagents.list().catch(() => []),
     ]);
+    const customSubagents = allSubagents.filter((s) => s.scope !== "builtin");
+    if (subagentDef?.tools && subagentDef.tools.length > 0) {
+      const allowed = new Set(subagentDef.tools);
+      this.tools = this.tools.filter((t) => allowed.has(t.id));
+    }
     const system = renderSystemPrompt({
       cwd: this.opts.cwd,
       workspaceRoot: this.opts.cwd,
       profile,
+      subagentPrompt: subagentDef?.prompt,
       mode: this.opts.mode,
       tools: this.tools,
       rules,
@@ -256,6 +275,8 @@ export class AgentRunner {
       addendum: this.opts.settings.systemPromptAddendum,
       providerHostedTools: this.provider.hostedTools,
       platformName: this.opts.platformName ?? `${os.hostname()}`,
+      subscription: this.opts.subscription,
+      customSubagents,
     });
     const specs = this.tools.map((t) => ({ name: t.id, description: t.description, parameters: t.parameters }));
     return { system, specs };

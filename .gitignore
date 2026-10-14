@@ -17,3 +17,6 @@ apps/web/dist/
 apps/desktop/release/
 apps/desktop/resources/
 apps/desktop/build/icon.png
+.vercel
+binaries/
+.nimbus/

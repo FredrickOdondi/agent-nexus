@@ -1,8 +1,11 @@
 import type {
   Part,
   PermissionMode,
+  PlanLimits,
   ProviderSettings,
   QuestionOption,
+  SubagentInfo,
+  SubscriptionInfo,
   TodoItem,
   ToolDisplay,
   ToolInfo,
@@ -92,12 +95,16 @@ export interface SessionServices {
   getTodos(): TodoItem[];
   memory: MemoryStore;
   skills: SkillCatalog;
+  subagents: SubagentCatalog;
   processes: ProcessManager;
   tasks: TaskManager;
   planMode: { active: boolean; enter(): void; exit(plan: string): Promise<boolean> };
   log: (level: "info" | "warn" | "error", msg: string, extra?: unknown) => void;
   settings: { webSearchEnabled: boolean; subagentsEnabled: boolean; provider: ProviderSettings };
+  subscription?: SubscriptionInfo;
+  limits?: PlanLimits;
   checkpoints: CheckpointStore;
+  onSubagentsChanged?: () => void | Promise<void>;
 }
 
 export interface MemoryStore {
@@ -108,6 +115,11 @@ export interface MemoryStore {
 export interface SkillCatalog {
   list(): Promise<{ name: string; description: string; path: string; scope: "local" | "repo" | "user" }[]>;
   load(name: string): Promise<string | null>;
+}
+
+export interface SubagentCatalog {
+  list(): Promise<SubagentInfo[]>;
+  load(name: string): Promise<SubagentInfo | null>;
 }
 
 export interface BackgroundProcess {

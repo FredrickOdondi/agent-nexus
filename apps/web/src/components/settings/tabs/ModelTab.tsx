@@ -10,7 +10,7 @@ import { Field, Section, ToggleRow, selectClass } from "../SettingsDialog";
 const PROVIDER_ORDER: ProviderKind[] = ["deepseek", "xai", "openai_compatible", "mock"];
 
 const PRESETS: Record<ProviderKind, { label: string; baseUrl: string; models: string[]; keyHint: string }> = {
-  deepseek: { label: "DeepSeek", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-pro", "deepseek-flash"], keyHint: "Create a key at platform.deepseek.com. You can also set DEEPSEEK_API_KEY before starting Nimbus. Thinking mode stays on so tool calls keep their reasoning." },
+  deepseek: { label: "DeepSeek", baseUrl: "https://api.deepseek.com", models: ["deepseek-v4-pro", "deepseek-flash"], keyHint: "Create a key at platform.deepseek.com. You can also set DEEPSEEK_API_KEY before starting Nimbus. deepseek-flash accepts images (required for the computer/screen tool); deepseek-v4-pro is text-only. Thinking mode stays on so tool calls keep their reasoning." },
   xai: { label: "xAI Grok (Responses API + Agent Tools)", baseUrl: "https://api.x.ai/v1", models: ["grok-4-1-fast-reasoning", "grok-4-1-fast-non-reasoning", "grok-4", "grok-3-mini"], keyHint: "Create a key at console.x.ai. Enables server-side web_search, x_search and code_execution." },
   openai_compatible: { label: "OpenAI-compatible (OpenAI, OpenRouter, Ollama, LM Studio…)", baseUrl: "https://api.openai.com/v1", models: ["gpt-4.1-mini", "gpt-4.1", "o4-mini", "llama3.1", "qwen2.5-coder:14b"], keyHint: "Any chat/completions endpoint with function calling. Ollama: http://localhost:11434/v1 (no key needed)." },
   mock: { label: "Offline demo (no model)", baseUrl: "", models: ["nimbus-demo"], keyHint: "Scripted responses that still exercise the tool loop. Great for exploring the UI." },

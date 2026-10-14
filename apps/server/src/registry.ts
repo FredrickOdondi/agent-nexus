@@ -37,6 +37,10 @@ export class SpaceRegistry {
     this.tokenFile = path.join(cfg.dataDir, "user-device-tokens.json");
   }
 
+  get dataDir(): string {
+    return this.cfg.dataDir;
+  }
+
   /** Hub subscribes so events from a space reach only that space's sockets. */
   onSpace(fn: (rt: SpaceRuntime) => void) {
     this.listeners.add(fn);

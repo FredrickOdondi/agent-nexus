@@ -12,15 +12,21 @@ module.exports = {
     output: "release",
     buildResources: "build",
   },
-  files: ["dist/**", "package.json"],
+  files: ["dist/**", "package.json", "!**/node_modules/**/*"],
   extraResources: [
     { from: "../server/dist", to: "server", filter: ["**/*.js", "**/*.mjs", "**/*.map", "package.json"] },
     { from: "../web/dist", to: "web" },
-    { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c", "!nimbus-input", "!nimbus-input-*"] },
+    { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c", "!**/*.m", "!nimbus-input", "!nimbus-input-*", "!nimbus-see", "!nimbus-see-*"] },
   ],
   mac: {
     category: "public.app-category.productivity",
     target: [{ target: "dmg", arch: ["universal"] }],
+    x64ArchFiles: "**/node_modules/**/*",
+    signIgnore: [
+      "Electron Framework\\.framework/Versions/Current",
+      "Electron Framework\\.framework/Helpers",
+      "Electron Framework\\.framework/Libraries",
+    ],
     hardenedRuntime: signed,
     gatekeeperAssess: false,
     entitlements: "build/entitlements.mac.plist",
@@ -29,9 +35,15 @@ module.exports = {
     extendInfo: {
       NSScreenCaptureUsageDescription: "Nimbus takes a screenshot so the agent can see this screen and click what you ask.",
     },
-    extraResources: [{ from: "resources/screen/nimbus-input", to: "screen/nimbus-input" }],
+    extraResources: [
+      { from: "resources/screen/nimbus-input", to: "screen/nimbus-input" },
+      { from: "resources/screen/nimbus-see", to: "screen/nimbus-see" },
+    ],
   },
-  dmg: { title: "Nimbus" },
+  dmg: {
+    title: "Nimbus",
+    writeUpdateInfo: false,
+  },
   win: {
     target: [{ target: "nsis", arch: ["x64", "arm64"] }],
   },

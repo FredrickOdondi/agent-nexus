@@ -1,4 +1,5 @@
-import type { Conversation, Device, EphemeralEvent, Message, PersistedEvent, SpaceSettings, SyncEvent } from "@nimbus/shared";
+import type { Conversation, Device, EphemeralEvent, Message, PersistedEvent, SpaceSettings, SubscriptionInfo, SyncEvent } from "@nimbus/shared";
+import { DEFAULT_FREE_SUBSCRIPTION, FREE_PLAN_LIMITS, PRO_PLAN_LIMITS, TRIAL_DURATION_MS } from "@nimbus/shared";
 import type { Db } from "./db.js";
 
 /**
@@ -33,6 +34,62 @@ export class SpaceService {
   saveSettings(settings: SpaceSettings) {
     this.db.saveSettings(this.spaceId, settings);
     this.emit({ type: "settings.update", settings: redactSettings(settings) });
+  }
+
+  // ---- subscription & billing
+  getSubscription(): SubscriptionInfo {
+    return this.db.getSubscription(this.spaceId);
+  }
+
+  saveSubscription(sub: SubscriptionInfo) {
+    this.db.saveSubscription(this.spaceId, sub);
+    this.emit({ type: "subscription.update", subscription: sub });
+  }
+
+  startTrial(): SubscriptionInfo {
+    const current = this.getSubscription();
+    if (!current.isTrialEligible && current.status !== "expired") {
+      throw new Error("This space has already used its 14-day Pro trial.");
+    }
+    const now = Date.now();
+    const trial: SubscriptionInfo = {
+      tier: "pro",
+      status: "trialing",
+      planName: "Nimbus Pro (Trial)",
+      trialStartedAt: now,
+      trialExpiresAt: now + TRIAL_DURATION_MS,
+      isTrialEligible: false,
+      limits: PRO_PLAN_LIMITS,
+    };
+    this.saveSubscription(trial);
+    return trial;
+  }
+
+  activateLicense(rawKey: string): SubscriptionInfo {
+    const key = rawKey.trim();
+    if (!key || key.length < 5) throw new Error("Please enter a valid license key.");
+    const upper = key.toUpperCase();
+    const isLifetime = upper.includes("LIFE") || upper.includes("LIFETIME");
+    const planName = isLifetime ? "Nimbus Pro (Lifetime)" : "Nimbus Pro";
+    const billingInterval = isLifetime ? "lifetime" : "year";
+
+    const sub: SubscriptionInfo = {
+      tier: "pro",
+      status: "active",
+      planName,
+      billingInterval,
+      licenseKey: key,
+      isTrialEligible: false,
+      limits: PRO_PLAN_LIMITS,
+    };
+    this.saveSubscription(sub);
+    return sub;
+  }
+
+  resetSubscription(): SubscriptionInfo {
+    const reset = { ...DEFAULT_FREE_SUBSCRIPTION };
+    this.saveSubscription(reset);
+    return reset;
   }
 
   // ---- conversations

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, SquarePen } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useConversation, useStore } from "@/lib/store";
 import { Sidebar } from "./Sidebar";
 import { Thread } from "@/components/chat/Thread";
@@ -12,6 +13,7 @@ import { Thread } from "@/components/chat/Thread";
 export function MobileShell() {
   const [screen, setScreen] = useState<"list" | "thread">("list");
   const selectedId = useStore((s) => s.selectedId);
+  const newChat = useStore((s) => s.newChat);
   const conversation = useConversation(selectedId);
   const draftMode = useStore((s) => s.draftMode);
   const run = useStore((s) => (selectedId ? s.runs[selectedId] : undefined));
@@ -79,16 +81,28 @@ export function MobileShell() {
             exit={{ x: "100%" }}
             transition={{ type: "spring", stiffness: 420, damping: 40 }}
           >
-            <header className="relative z-10 flex shrink-0 items-center gap-1 border-b bg-background/85 px-1 pt-[env(safe-area-inset-top)] glass">
-              <button type="button" onClick={showList} className="flex h-12 items-center gap-0.5 rounded-lg px-1 text-[17px] text-primary active:opacity-60">
-                <ChevronLeft className="size-6" />
-                Chats
+            <header className="relative z-10 flex shrink-0 items-center justify-between border-b bg-background/85 px-2 pt-[env(safe-area-inset-top)] glass min-h-[46px]">
+              <button type="button" onClick={showList} className="flex h-11 items-center gap-0.5 rounded-lg px-1.5 text-[16px] font-medium text-primary active:opacity-60">
+                <ChevronLeft className="size-5.5" />
+                <span>Chats</span>
               </button>
-              <div className="pointer-events-none absolute inset-x-24 bottom-1.5 flex flex-col items-center">
-                <h2 className="max-w-full truncate text-[17px] leading-tight font-semibold">{title}</h2>
+              <div className="pointer-events-none flex flex-col items-center px-2 min-w-0 max-w-[55%]">
+                <h2 className="max-w-full truncate text-[15px] leading-tight font-semibold">{title}</h2>
                 <p className="max-w-full truncate text-[11px] text-muted-foreground">{subtitle}</p>
               </div>
-              <span className="ml-auto w-16" aria-hidden />
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => {
+                    newChat();
+                  }}
+                  className="rounded-full text-muted-foreground hover:text-foreground"
+                  aria-label="New chat"
+                >
+                  <SquarePen className="size-4.5" />
+                </Button>
+              </div>
             </header>
             <Thread />
           </motion.div>
