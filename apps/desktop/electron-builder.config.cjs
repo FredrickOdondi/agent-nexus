@@ -18,9 +18,18 @@ module.exports = {
     { from: "../web/dist", to: "web" },
     { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c", "!**/*.m", "!nimbus-input", "!nimbus-input-*", "!nimbus-see", "!nimbus-see-*"] },
   ],
+  publish: {
+    provider: "github",
+    owner: "FredrickOdondi",
+    repo: "agent-nexus",
+    releaseType: "release",
+  },
   mac: {
     category: "public.app-category.productivity",
-    target: [{ target: "dmg", arch: ["universal"] }],
+    target: [
+      { target: "dmg", arch: ["universal"] },
+      { target: "zip", arch: ["universal"] },
+    ],
     x64ArchFiles: "**/node_modules/**/*",
     signIgnore: [
       "Electron Framework\\.framework/Versions/Current",

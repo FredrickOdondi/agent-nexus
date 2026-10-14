@@ -24,4 +24,17 @@ contextBridge.exposeInMainWorld("nimbus", {
     close() { ipcRenderer.send("nimbus:win", "close"); },
     isMaximized() { return ipcRenderer.invoke("nimbus:win-maximized"); },
   },
+  updater: {
+    checkForUpdates() {
+      return ipcRenderer.invoke("nimbus:check-for-updates");
+    },
+    installUpdate() {
+      return ipcRenderer.invoke("nimbus:install-update");
+    },
+    onStatus(callback) {
+      const listener = (_event, data) => callback(data);
+      ipcRenderer.on("nimbus:update-status", listener);
+      return () => ipcRenderer.removeListener("nimbus:update-status", listener);
+    },
+  },
 });

@@ -4,6 +4,7 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { autoUpdater } from "electron-updater";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const devMode = process.argv.includes("--dev") || process.env.NIMBUS_DEV === "1";
@@ -297,6 +298,86 @@ function registerIpc() {
     else if (action === "close") win.close();
   });
   ipcMain.handle("nimbus:win-maximized", (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false);
+  ipcMain.handle("nimbus:check-for-updates", async () => {
+    if (!app.isPackaged) {
+      return { state: "dev", message: "Auto-updates are inactive in development mode." };
+    }
+    try {
+      const res = await autoUpdater.checkForUpdates();
+      return {
+        state: res?.updateInfo ? "checking" : "not-available",
+        version: res?.updateInfo?.version,
+      };
+    } catch (err) {
+      return { state: "error", message: (err as Error).message };
+    }
+  });
+  ipcMain.handle("nimbus:install-update", () => {
+    if (app.isPackaged) {
+      autoUpdater.quitAndInstall();
+      return true;
+    }
+    return false;
+  });
+}
+
+function initAutoUpdater() {
+  if (!app.isPackaged) return;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    mainWindow?.webContents.send("nimbus:update-status", { state: "checking" });
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    mainWindow?.webContents.send("nimbus:update-status", {
+      state: "available",
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on("update-not-available", (info) => {
+    mainWindow?.webContents.send("nimbus:update-status", {
+      state: "not-available",
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    mainWindow?.webContents.send("nimbus:update-status", {
+      state: "downloading",
+      percent: Math.round(progress.percent),
+      bytesPerSecond: progress.bytesPerSecond,
+    });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    mainWindow?.webContents.send("nimbus:update-status", {
+      state: "downloaded",
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on("error", (err) => {
+    mainWindow?.webContents.send("nimbus:update-status", {
+      state: "error",
+      message: err?.message ?? "Update check failed",
+    });
+  });
+
+  // Delay initial update check slightly to prioritize clean window startup
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.warn("[nimbus] background update check:", err?.message);
+    });
+  }, 7000);
+
+  // Check periodically every 4 hours
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 4 * 60 * 60 * 1000);
 }
 
 const gotLock = app.requestSingleInstanceLock();
@@ -314,6 +395,7 @@ if (!gotLock) {
     try {
       const server = await ensureServer();
       createWindow(await uiUrl(server.url));
+      initAutoUpdater();
     } catch (err) {
       dialog.showErrorBox("Nimbus couldn't start", (err as Error).message);
       app.quit();

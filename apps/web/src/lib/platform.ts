@@ -1,5 +1,15 @@
 import type { Platform } from "@nimbus/shared";
 
+export type UpdateState = "checking" | "available" | "downloading" | "downloaded" | "not-available" | "error" | "dev";
+
+export interface UpdateStatus {
+  state: UpdateState;
+  version?: string;
+  percent?: number;
+  bytesPerSecond?: number;
+  message?: string;
+}
+
 export interface NimbusBridge {
   platform: string;
   version: string;
@@ -7,6 +17,11 @@ export interface NimbusBridge {
   openExternal(url: string): Promise<boolean>;
   pickFolder(): Promise<string | null>;
   window: { minimize(): void; maximize(): void; close(): void; isMaximized(): Promise<boolean> };
+  updater?: {
+    checkForUpdates(): Promise<UpdateStatus>;
+    installUpdate(): Promise<boolean>;
+    onStatus(callback: (status: UpdateStatus) => void): () => void;
+  };
   serverUrl: string;
 }
 

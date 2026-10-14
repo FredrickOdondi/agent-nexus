@@ -19,6 +19,7 @@ import { supabaseAccessToken } from "@/lib/supabase";
 import { isElectron, isMac, isStandalonePwa } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { LandingPage } from "@/components/landing/LandingPage";
+import { UpdateBanner } from "@/components/layout/UpdateBanner";
 
 function useMediaQuery(query: string) {
   const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
@@ -311,6 +312,7 @@ function Shell() {
         <MobileShell />
         <SettingsDialog />
         <UpgradeModal />
+        <UpdateBanner />
       </>
     );
   }
@@ -333,6 +335,7 @@ function Shell() {
       </main>
       <SettingsDialog />
       <UpgradeModal />
+      <UpdateBanner />
     </div>
   );
 }
