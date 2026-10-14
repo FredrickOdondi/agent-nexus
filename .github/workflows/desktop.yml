@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   pack:
     name: ${{ matrix.os == 'macos-latest' && 'macOS' || 'Windows' }}
@@ -47,7 +50,11 @@ jobs:
             echo "No signing certificate in secrets. The installer will be unsigned."
             export CSC_IDENTITY_AUTO_DISCOVERY=false
           fi
-          pnpm desktop:dist
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            pnpm desktop:dist:win
+          else
+            pnpm desktop:dist
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -56,4 +63,17 @@ jobs:
             apps/desktop/release/*.dmg
             apps/desktop/release/*.exe
             apps/desktop/release/*.zip
+            apps/desktop/release/*.yml
           if-no-files-found: error
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.yml
+            apps/desktop/release/*.blockmap
+
