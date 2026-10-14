@@ -172,21 +172,19 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
     }
 
     const wifi = wifiHost(cfg);
-    if (!wifi) {
-      const error = cfg.lanBound === false
-        ? process.platform === "darwin"
-          ? "macOS has not allowed Nimbus onto the local network yet. In System Settings, open Privacy & Security → Local Network, allow Nimbus, then reopen the app and generate a new code."
-          : process.platform === "win32"
-            ? "Windows has not allowed Nimbus through the firewall yet. Allow it, then reopen the app and generate a new code."
-            : "This computer has not allowed Nimbus onto the local network yet. Allow local connections, then reopen the app and generate a new code."
-        : "This computer has no Wi‑Fi address. Join the same network as the phone, then generate a new code.";
-      return c.json({ error }, 409);
-    }
+    const cloudBase = "https://agent-nexus-eight.vercel.app";
     const { code, expiresAt } = db.createPairing(dev.spaceId);
     const hosts = phoneHosts(cfg);
-    const url = `${uiOrigin(cfg, wifi)}/#/pair/${code}`;
+    const url = wifi ? `${uiOrigin(cfg, wifi)}/#/pair/${code}` : `${cloudBase}/#/pair/${code}`;
     const qr = await QRCode.toDataURL(url, { margin: 1, width: 320, color: { dark: "#0b0b0f", light: "#ffffff" } });
-    const ticket: PairingTicket & { qr: string; lanUrls: string[] } = { code, url, expiresAt, qr, lanUrls: hosts.map((host) => uiOrigin(cfg, host)) };
+    const ticket: PairingTicket & { qr: string; lanUrls: string[]; cloudUrl: string } = {
+      code,
+      url,
+      expiresAt,
+      qr,
+      lanUrls: hosts.map((host) => uiOrigin(cfg, host)),
+      cloudUrl: `${cloudBase}/#/pair/${code}`,
+    };
     return c.json(ticket);
   });
 
@@ -241,6 +239,7 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
     if (denied) return c.json({ error: denied }, 403);
     const conflict = db.bindAccount(spaceId, user);
     if (conflict) return c.json({ error: conflict }, 403);
+    registry.emitAccountBound(user.id, spaceId);
     if (!db.claimPairing(code)) return c.json({ error: "That code is invalid or has expired. Generate a new one on the desktop." }, 400);
 
     const sub = db.getSubscription(spaceId);

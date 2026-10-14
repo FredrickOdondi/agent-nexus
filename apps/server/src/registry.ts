@@ -27,6 +27,7 @@ export interface LinkedDevice {
 export class SpaceRegistry {
   private runtimes = new Map<string, SpaceRuntime>();
   private listeners = new Set<(rt: SpaceRuntime) => void>();
+  private accountListeners = new Set<(userId: string, spaceId: string) => void>();
   private readonly tokenFile: string;
 
   constructor(
@@ -39,6 +40,16 @@ export class SpaceRegistry {
 
   get dataDir(): string {
     return this.cfg.dataDir;
+  }
+
+  /** Subscribe to account binds so relays can join remote channels immediately */
+  onAccount(fn: (userId: string, spaceId: string) => void) {
+    this.accountListeners.add(fn);
+    return () => this.accountListeners.delete(fn);
+  }
+
+  emitAccountBound(userId: string, spaceId: string) {
+    for (const l of this.accountListeners) l(userId, spaceId);
   }
 
   /** Hub subscribes so events from a space reach only that space's sockets. */
@@ -69,6 +80,7 @@ export class SpaceRegistry {
     const existing = this.db.accountByUser(user.id);
     if (existing) {
       this.db.bindAccount(existing.spaceId, user);
+      this.emitAccountBound(user.id, existing.spaceId);
       const saved = this.tokens()[user.id];
       if (saved) {
         const dev = this.db.deviceByToken(saved);
@@ -87,6 +99,7 @@ export class SpaceRegistry {
     this.db.createSpace(spaceId, name, workspace);
     const conflict = this.db.bindAccount(spaceId, user);
     if (conflict) throw new Error(conflict);
+    this.emitAccountBound(user.id, spaceId);
     this.log("info", "created space for google account", spaceId);
     return this.issueDesktopToken(spaceId, user.id);
   }
@@ -101,6 +114,7 @@ export class SpaceRegistry {
     if (!dev) return { ok: false, status: 401, error: "unauthorized" };
     const conflict = this.db.bindAccount(dev.spaceId, user);
     if (conflict) return { ok: false, status: 403, error: conflict };
+    this.emitAccountBound(user.id, dev.spaceId);
     if (dev.primary) this.rememberToken(user.id, rawToken);
     this.get(dev.spaceId);
     return { ok: true };

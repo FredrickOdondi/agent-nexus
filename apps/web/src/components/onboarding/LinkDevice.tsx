@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { DEVICE_NAME_KEY, TOKEN_KEY, useStore } from "@/lib/store";
 import { supabaseAccessToken } from "@/lib/supabase";
 import { defaultDeviceName, detectPlatform, isElectron } from "@/lib/platform";
+import { requestRemoteBootstrap } from "@/lib/remote-bootstrap";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -78,7 +79,21 @@ export function LinkDevice({ initialCode, onLinked, onPhase }: Props) {
           return;
         }
       } catch {
-        /* server not reachable on loopback: fall through to code entry */
+        /* server not reachable on loopback: attempt remote bootstrap over Realtime */
+      }
+      if (userId && !cancelled) {
+        try {
+          const remoteToken = await requestRemoteBootstrap(userId, name);
+          if (remoteToken && !cancelled) {
+            remember(remoteToken);
+            localStorage.setItem(DEVICE_NAME_KEY, name);
+            setPhase("done");
+            onLinked();
+            return;
+          }
+        } catch {
+          /* fall back to code entry */
+        }
       }
       if (!cancelled) setPhase("code");
     })();

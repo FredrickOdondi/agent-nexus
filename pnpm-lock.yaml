@@ -41,6 +41,9 @@ importers:
       '@nimbus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@supabase/supabase-js':
+        specifier: ^2.117.3
+        version: 2.117.3
       hono:
         specifier: ^4.10.0
         version: 4.13.13

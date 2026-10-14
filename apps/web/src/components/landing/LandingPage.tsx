@@ -732,10 +732,10 @@ export function LandingPage({ onLaunchApp }: { onLaunchApp: () => void }) {
                   <strong className="text-foreground">Open the .dmg file:</strong> Locate <code>Nimbus-universal.dmg</code> in your Downloads folder and double-click it.
                 </li>
                 <li className="leading-relaxed">
-                  <strong className="text-foreground">Drag to Applications:</strong> Drag the Nimbus app icon into your macOS Applications folder.
+                  <strong className="text-foreground">Drag to Applications:</strong> Drag the Nimbus icon into your Applications folder.
                 </li>
                 <li className="leading-relaxed">
-                  <strong className="text-foreground">Launch Nimbus:</strong> Open Nimbus from Spotlight or Launchpad. Plug in your Ollama or OpenAI key and you're ready!
+                  <strong className="text-foreground">First-Time Launch:</strong> If macOS displays an <em>"unidentified developer"</em> notice, open <strong>System Settings → Privacy &amp; Security</strong>, scroll down to Security, and click <strong>"Open Anyway"</strong> (or right-click Nimbus in Applications and select <strong>Open</strong>).
                 </li>
               </ol>
             ) : (

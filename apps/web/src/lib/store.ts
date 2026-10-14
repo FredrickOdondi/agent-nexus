@@ -131,6 +131,8 @@ export const useStore = create<State>((set, get) => ({
     set({ seq: seq ?? 0, conversations: sortConversations(cachedConvs), selectedId: phone ? null : (selected ?? null), bootstrapped: true });
     if (!phone && selected) void get().ensureMessages(selected);
 
+    const user = (await supabase.auth.getSession().catch(() => ({ data: { session: null } }))).data.session?.user;
+
     client?.close();
     client = new SyncClient({
       token,
@@ -138,6 +140,8 @@ export const useStore = create<State>((set, get) => ({
       getSince: () => get().seq,
       onState: (connection) => set({ connection }),
       onMessage: (msg) => handleServerMessage(msg, set, get),
+      userId: user?.id ?? null,
+      deviceId: get().deviceId ?? null,
     });
     client.connect();
     const nudge = () => client?.nudge();

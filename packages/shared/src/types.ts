@@ -283,6 +283,7 @@ export interface PairingTicket {
   code: string;
   url: string;
   expiresAt: number;
+  cloudUrl?: string;
 }
 
 export interface HealthInfo {

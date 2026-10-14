@@ -18,6 +18,7 @@
     "@hono/node-server": "^1.19.0",
     "@nimbus/agent-core": "workspace:*",
     "@nimbus/shared": "workspace:*",
+    "@supabase/supabase-js": "^2.117.3",
     "hono": "^4.10.0",
     "qrcode": "^1.5.4",
     "ws": "^8.18.0"

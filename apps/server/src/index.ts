@@ -6,6 +6,7 @@ import { Db } from "./db.js";
 import { createHttpApp, phoneHosts, uiOrigin } from "./http.js";
 import { Hub } from "./hub.js";
 import { SpaceRegistry } from "./registry.js";
+import { SupabaseRealtimeRelay } from "./supabase-relay.js";
 
 for (const stream of [process.stdout, process.stderr]) stream.on("error", () => {});
 process.removeAllListeners("warning");
@@ -73,6 +74,7 @@ async function main() {
   const db = new Db(cfg.dataDir);
   const registry = new SpaceRegistry(db, cfg, log);
   const hub = new Hub(db, registry, log);
+  const relay = new SupabaseRealtimeRelay(db, registry, hub, log);
   const app = createHttpApp(cfg, db, registry, startedAt);
   const fetch = (req: Request, env: { incoming?: { socket?: { remoteAddress?: string } } }) => {
     return app.fetch(req, { remote: env?.incoming?.socket?.remoteAddress });
@@ -98,6 +100,7 @@ async function main() {
 
   const shutdown = () => {
     log("info", "shutting down");
+    relay.close();
     server.close();
     db.close();
     process.exit(0);

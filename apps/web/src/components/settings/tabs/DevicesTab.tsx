@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Laptop, LogOut, Monitor, Pencil, QrCode, RefreshCw, Smartphone, Trash2 } from "lucide-react";
+import { Laptop, LogOut, Monitor, Pencil, QrCode, RefreshCw, Smartphone, Trash2, Globe } from "lucide-react";
 import { NimbusMark } from "@/components/brand/NimbusMark";
 import { toast } from "sonner";
 import { formatRelative } from "@nimbus/shared";
@@ -11,7 +11,7 @@ import { DEVICE_NAME_KEY, TOKEN_KEY, useStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { Section } from "../SettingsDialog";
 
-interface Ticket { code: string; url: string; expiresAt: number; qr: string; lanUrls: string[] }
+interface Ticket { code: string; url: string; expiresAt: number; qr: string; lanUrls: string[]; cloudUrl?: string }
 
 export function DevicesTab() {
   const devices = useStore((s) => s.devices);
@@ -46,7 +46,34 @@ export function DevicesTab() {
 
   return (
     <div>
-      <Section title="Link a phone or another computer" description="The QR code opens this computer’s Wi‑Fi address, so the phone stays on the same network. Generate a new code after you join Wi‑Fi. A .local name is only for a home-screen icon.">
+      <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <Globe className="size-5" />
+          </div>
+          <div className="flex-1">
+            <p className="font-semibold text-foreground">Sync from Anywhere (5G & Wi‑Fi)</p>
+            <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+              No need to be on the same Wi‑Fi. Open <span className="font-mono font-medium text-foreground">agent-nexus-eight.vercel.app</span> on your mobile browser and sign in with the same Google account. Your phone connects to this desktop from anywhere in the world.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => {
+                  void navigator.clipboard.writeText("https://agent-nexus-eight.vercel.app");
+                  toast.success("Web app URL copied to clipboard");
+                }}
+              >
+                Copy Web App URL
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Section title="Link locally with QR code" description="Scan with your phone camera to pair over local Wi‑Fi or open the web app with the code pre-filled.">
         <div className="grid gap-4 sm:grid-cols-[auto_1fr]">
           <div className="flex size-56 items-center justify-center rounded-2xl border bg-white p-3 elevation-1 dark:bg-white">
             <AnimatePresence mode="wait">

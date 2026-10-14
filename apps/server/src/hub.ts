@@ -10,15 +10,21 @@ import type { Db } from "./db.js";
 import type { SpaceRegistry } from "./registry.js";
 import { redactSettings } from "./space.js";
 
-interface Connection {
-  ws: WebSocket;
+export interface TransportConnection {
   device: Device | null;
+  send(msg: ServerMessage): void;
+  close?(code?: number, reason?: string): void;
+}
+
+interface WsConnection extends TransportConnection {
+  ws: WebSocket;
   alive: boolean;
 }
 
 export class Hub {
   private wss: WebSocketServer;
-  private conns = new Set<Connection>();
+  private conns = new Set<WsConnection>();
+  private broadcastListeners = new Set<(spaceId: string, msg: ServerMessage) => void>();
 
   constructor(
     private db: Db,
@@ -43,6 +49,11 @@ export class Hub {
     }, 30_000).unref();
   }
 
+  onBroadcast(fn: (spaceId: string, msg: ServerMessage) => void) {
+    this.broadcastListeners.add(fn);
+    return () => this.broadcastListeners.delete(fn);
+  }
+
   handleUpgrade(req: IncomingMessage, socket: any, head: Buffer) {
     this.wss.handleUpgrade(req, socket, head, (ws) => this.wss.emit("connection", ws, req));
   }
@@ -50,10 +61,11 @@ export class Hub {
   private broadcast(spaceId: string, msg: ServerMessage) {
     const data = JSON.stringify(msg);
     for (const c of this.conns) if (c.device?.spaceId === spaceId && c.ws.readyState === c.ws.OPEN) c.ws.send(data);
+    for (const fn of this.broadcastListeners) fn(spaceId, msg);
   }
 
-  private send(c: Connection, msg: ServerMessage) {
-    if (c.ws.readyState === c.ws.OPEN) c.ws.send(JSON.stringify(msg));
+  private send(c: TransportConnection, msg: ServerMessage) {
+    c.send(msg);
   }
 
   private presence(spaceId: string) {
@@ -64,7 +76,13 @@ export class Hub {
   }
 
   private onConnection(ws: WebSocket) {
-    const conn: Connection = { ws, device: null, alive: true };
+    const conn: WsConnection = {
+      ws,
+      device: null,
+      alive: true,
+      send: (msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)); },
+      close: (code, reason) => { ws.close(code, reason); },
+    };
     this.conns.add(conn);
     ws.on("pong", () => (conn.alive = true));
     ws.on("close", () => {
@@ -88,14 +106,24 @@ export class Hub {
     });
   }
 
-  private async handle(conn: Connection, msg: ClientMessage) {
+  async handleTransportMessage(conn: TransportConnection, msg: ClientMessage) {
+    try {
+      await this.handle(conn, msg);
+    } catch (e) {
+      this.log("error", "transport command failed", (e as Error).message);
+      if (msg.requestId) this.send(conn, { type: "ack", requestId: msg.requestId, ok: false, error: (e as Error).message });
+      else this.send(conn, { type: "error", error: (e as Error).message });
+    }
+  }
+
+  private async handle(conn: TransportConnection, msg: ClientMessage) {
     const ack = (result?: unknown) => { if (msg.requestId) this.send(conn, { type: "ack", requestId: msg.requestId, ok: true, result }); };
 
     if (msg.type === "hello") {
       const device = this.db.deviceByToken(msg.token);
       if (!device) {
         this.send(conn, { type: "error", error: "unauthorized" });
-        conn.ws.close(4001, "unauthorized");
+        conn.close?.(4001, "unauthorized");
         return;
       }
       const rt = this.registry.get(device.spaceId);

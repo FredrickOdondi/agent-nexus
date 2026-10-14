@@ -146,6 +146,11 @@ export class Db {
     return r ? rowToAccount(r) : null;
   }
 
+  listAccounts(): AccountRecord[] {
+    const rows = this.db.prepare("SELECT space_id, user_id, email, name, avatar FROM accounts").all() as AccountSql[];
+    return rows.map(rowToAccount);
+  }
+
   /**
    * Bind this Google user to this space.
    * A space keeps the first account that claimed it, and a user keeps the first space they claimed.
