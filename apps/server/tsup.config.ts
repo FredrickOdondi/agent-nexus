@@ -24,7 +24,7 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   outExtension: () => ({ js: ".mjs" }),
-  noExternal: [/^@nimbus\//, /^@composio\//, /^@modelcontextprotocol\//, "hono", "@hono/node-server", "ws", "qrcode", "fast-glob", "ignore", "node-html-markdown"],
+  noExternal: [/^@nimbus\//, /^@composio\//, /^@modelcontextprotocol\//, /^@supabase\//, "hono", "@hono/node-server", "ws", "qrcode", "fast-glob", "ignore", "node-html-markdown"],
   banner: { js: "#!/usr/bin/env node\nimport { createRequire } from 'node:module'; const require = createRequire(import.meta.url);" },
   async onSuccess() {
     const text = readFileSync(bundle, "utf8")
