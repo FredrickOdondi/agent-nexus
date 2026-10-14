@@ -7,7 +7,7 @@
   "author": "Nimbus",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp preload.cjs dist/preload.cjs",
+    "build": "tsup && cp preload.cjs dist/preload.cjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "pnpm run build && electron . --dev",
     "start": "pnpm run build && electron .",
@@ -15,9 +15,11 @@
     "dist:win": "rm -rf release && pnpm run build && node scripts/stage-resources.mjs win && electron-builder --win --config electron-builder.config.cjs --publish never"
   },
   "devDependencies": {
+    "@electron/asar": "^4.3.1",
     "@types/node": "^22.19.0",
     "electron": "44.7.0",
     "electron-builder": "^26.0.12",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3"
   },
   "dependencies": {
