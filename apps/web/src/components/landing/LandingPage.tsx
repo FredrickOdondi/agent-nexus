@@ -26,11 +26,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export const DOWNLOAD_LINKS = {
-  macUniversal: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.0-universal.dmg",
-  macArm64: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.0-universal.dmg",
-  macIntel: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.0-universal.dmg",
-  windowsExe: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus.Setup.0.1.0.exe",
-  windowsArm64: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus.Setup.0.1.0.exe",
+  macUniversal: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.1-universal.dmg",
+  macArm64: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.1-universal.dmg",
+  macIntel: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.1-universal.dmg",
+  windowsExe: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus.Setup.0.1.1.exe",
+  windowsArm64: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus.Setup.0.1.1.exe",
   githubReleases: "https://github.com/FredrickOdondi/agent-nexus/releases",
 };
 
@@ -101,7 +101,7 @@ export function LandingPage({ onLaunchApp }: { onLaunchApp: () => void }) {
               Nimbus
             </span>
             <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary uppercase tracking-wider">
-              v0.1.0 Live
+              v0.1.1 Live
             </span>
           </div>
 
@@ -514,7 +514,7 @@ export function LandingPage({ onLaunchApp }: { onLaunchApp: () => void }) {
                       </div>
                     </div>
                     <span className="rounded-full bg-primary/10 text-primary text-[11px] font-bold px-2.5 py-0.5">
-                      v0.1.0
+                      v0.1.1
                     </span>
                   </div>
 
@@ -563,7 +563,7 @@ export function LandingPage({ onLaunchApp }: { onLaunchApp: () => void }) {
                       </div>
                     </div>
                     <span className="rounded-full bg-primary/10 text-primary text-[11px] font-bold px-2.5 py-0.5">
-                      v0.1.0
+                      v0.1.1
                     </span>
                   </div>
 

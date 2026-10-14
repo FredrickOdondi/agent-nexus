@@ -139,7 +139,7 @@ export function createHttpApp(cfg: ServerConfig, db: Db, registry: SpaceRegistry
   app.use("/api/*", cors());
 
   app.get("/api/health", (c) => {
-    const info: HealthInfo = { ok: true, version: "0.1.0", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: phoneHosts(cfg).map((host) => uiOrigin(cfg, host)) };
+    const info: HealthInfo = { ok: true, version: "0.1.1", uptimeMs: Date.now() - startedAt, dataDir: cfg.dataDir, lanUrls: phoneHosts(cfg).map((host) => uiOrigin(cfg, host)) };
     return c.json(info);
   });
 

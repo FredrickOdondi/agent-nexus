@@ -50,7 +50,7 @@ export function AboutTab() {
 
 function UpdaterControls() {
   const { status, checking, checkForUpdates, installUpdate, hasUpdateDownloaded, isDownloading } = useAutoUpdater();
-  const currentVersion = bridge?.version ?? "0.1.0";
+  const currentVersion = bridge?.version ?? "0.1.1";
 
   return (
     <div className="rounded-xl border bg-surface p-3.5 space-y-3">
