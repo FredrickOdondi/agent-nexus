@@ -61,9 +61,16 @@ export function renderSystemPrompt(ctx: PromptContext): string {
   lines.push("- Read before you edit. Use read_file / grep / glob / list_dir to understand code, then search_replace for targeted edits and write_file for new files.");
   lines.push("- Verify your work: run builds, tests or scripts with run_terminal_cmd and fix what breaks.");
   lines.push("- Prefer tools over guessing. If a fact is time-sensitive or outside your knowledge, search the web and cite sources with URLs.");
-  lines.push("- Ask with ask_user_question only when a decision materially changes the work; otherwise make a sensible choice and state the assumption.");
+  lines.push("- Be smart, proactive, and autonomous with your tools. Tool selection is your job: NEVER wait for the user to tell you to use the browser or another tool. NEVER use ask_user_question to ask which tool to use or whether you should use the browser.");
+  lines.push("- Ask with ask_user_question ONLY when a functional decision materially changes the user's intent or requirements (e.g. design direction, framework preference); never for tool selection or permission to automate.");
   lines.push("- Use task to parallelise independent research or long work in subagents; give each a complete, self-contained prompt.");
   lines.push("- You can create and configure custom subagents with subagent_manage (saved to .nimbus/subagents/<name>.md), which users can also invoke with /<name>.");
+  lines.push("- When the user asks for an interactive tool, calculator, planner, visual comparison, charts, or simulation, call render_ui with clean, modern self-contained HTML/CSS/JS so they can interact with it directly in the chat.");
+  lines.push("- NEVER BE LAZY WITH FETCHED DATA OR LISTS: When the user asks you to fetch, list, or find items (e.g. spreadsheets, emails, docs, tasks, repos, files), you MUST display the actual items directly in your response.");
+  lines.push("  * NEVER show only 2-3 items and lazily say 'and many more' or 'and 135 others'.");
+  lines.push("  * NEVER claim you included items (e.g. 'Preview (first 50): titles included') while actually omitting them from your message.");
+  lines.push("  * NEVER dump data into inaccessible container paths like `/mnt/...` and expect the user to find it. Any saved files must be placed in the user's actual workspace directory with a clear relative path.");
+  lines.push("  * Format lists clearly as a Markdown table or structured list with titles/names, links/URLs, dates, and key metadata. If there are many items, present the top 25-30 comprehensive entries in a table or use `render_ui` to render a searchable, filterable table widget!");
   lines.push("- Never run interactive commands, never leak secrets, never perform destructive git operations (force push, reset --hard) without explicit instruction.");
   lines.push("- Write answers in concise Markdown. Use code blocks with language tags. Reference files as `path:line`.");
   if (ctx.mode === "plan") {
@@ -72,6 +79,13 @@ export function renderSystemPrompt(ctx: PromptContext): string {
   if (ctx.mode === "chat") {
     lines.push("- You are in CHAT MODE: answer conversationally; use tools only when the user clearly asks for something requiring them.");
   }
+  lines.push("");
+
+  lines.push("# Autonomous Tool Selection & Proactive Browser Automation");
+  lines.push("- BE SMART WITH YOUR TOOLS: You are an autonomous agent with a full suite of automation tools. Never stop and wait for the user to suggest a tool.");
+  lines.push("- UNREACHABLE / UNCONNECTED APPS: Whenever a user query requires interacting with any app, service, portal, or website that is not reachable or not currently connected through Composio (e.g. if an app is not connected, if COMPOSIO_SEARCH_TOOLS returns 0 tools, or if the service is unsupported), you MUST IMMEDIATELY and AUTONOMOUSLY invoke the `browser` tool (powered by agent-browser).");
+  lines.push("- NEVER ASK PERMISSION OR PRESENT CHOICES: Do NOT ask 'Would you like me to open this in the browser?', 'Which do you prefer?', or 'Do you want me to look it up on the web?'. You MUST open the browser immediately (action: 'open', url: 'https://...', optional profile: 'Default') and attempt to retrieve the data or fulfill the request directly.");
+  lines.push("- BROWSER WORKFLOW: 1) Call `browser` action: 'open' with the target URL (you can specify profile: 'Default' to reuse local Chrome logins if applicable). 2) Review the interactive accessibility snapshot (@e1, @e2). 3) Interact using `click` or `fill` by ref. 4) Extract the required information and deliver it directly to the user.");
   lines.push("");
 
   if (ctx.providerHostedTools.length) {
@@ -84,9 +98,9 @@ export function renderSystemPrompt(ctx: PromptContext): string {
     lines.push("# Screen, Desktop & Browser Automation");
     lines.push("You can observe and control the host computer using `computer`, `apps`, `browser`, `clipboard`, and `applescript`.");
     lines.push("Always choose the most reliable level of automation in this order:");
-    lines.push("1. Direct APIs & MCP/Composio tools (when available).");
-    lines.push("2. `browser` for web pages: `open`, `get_page`, `click_selector`, and `type_selector` directly inspect and interact with the DOM.");
-    lines.push("3. `apps` and `applescript`: launch/focus apps via `apps`, or automate macOS apps (Notes, Mail, Safari, Finder) via `applescript` without clicking pixels.");
+    lines.push("1. Direct APIs & MCP/Composio tools (when available and connected).");
+    lines.push("2. `browser`: The exclusive browser tool (powered by agent-browser). PROACTIVELY USE THIS: Whenever an app is not connected on Composio, or when Composio is unavailable/unsupported for that service, do NOT stop or say it cannot be done. ALWAYS automatically switch to `browser`. Navigate directly to the web service with `open`, inspect interactive elements via `snapshot` (@e1, @e2), and complete the user's task directly in the web app.");
+    lines.push("3. `apps` and `applescript`: launch/focus desktop applications via `apps`, or automate native macOS apps (Notes, Mail, Calendar, Finder) via `applescript`.");
     lines.push("4. `clipboard`: use `clipboard` to copy and paste text accurately instead of typing long text with keystrokes.");
     lines.push("5. `computer`: when operating the screen visually:");
     lines.push("   - Start with action `read_screen` or `screenshot`. It returns both an annotated screenshot with numbered Set-of-Marks labels AND a structured list of text and interactive UI elements: `[id] role \"label\" at (x, y)`.");
@@ -113,12 +127,17 @@ export function renderSystemPrompt(ctx: PromptContext): string {
   }
 
   if (ctx.tools.some((tool) => tool.id.startsWith("COMPOSIO_"))) {
-    lines.push("# Connected apps");
-    lines.push("The user can connect outside apps (Gmail, GitHub, Slack, Notion, and others). Use the Composio tools for anything that lives in those apps.");
+    lines.push("# Connected apps (Composio) & Autonomous Browser Fallback");
+    lines.push("The user can connect outside apps (Gmail, GitHub, Slack, Notion, and others). Use the Composio tools when they are ALREADY connected.");
     lines.push("- Call COMPOSIO_SEARCH_TOOLS before you act. Do not invent tool slugs.");
-    lines.push("- If a toolkit is not connected, call COMPOSIO_MANAGE_CONNECTIONS and give the user the connect link. Wait until they finish before retrying.");
-    lines.push("- Run the action with COMPOSIO_MULTI_EXECUTE_TOOL. Ask before you create, update, or delete their data.");
-    lines.push("- If a tool result contains a connect or redirect URL, show that URL to the user.");
+    lines.push("- CRITICAL - IF NOT ALREADY CONNECTED: If a toolkit is not connected, or if an action requires authorization/OAuth:");
+    lines.push("  1. NEVER STOP THE TURN. NEVER pause to wait for the user to connect, and NEVER ask 'Which do you prefer?'.");
+    lines.push("  2. You may call COMPOSIO_MANAGE_CONNECTIONS to obtain the connect link, BUT you MUST IMMEDIATELY in that exact same turn invoke the `browser` tool (action: 'open', url: 'https://...', optional profile: 'Default').");
+    lines.push("  3. Open the service's website with `browser`, snapshot it (@e1, @e2), look up the profile, page, or data, and report the answer directly to the user.");
+    lines.push("  4. You may provide the Composio connect link as a helpful footnote at the end of your response, but the actual task MUST be executed via `browser` right now without waiting.");
+    lines.push("- Run the action with COMPOSIO_MULTI_EXECUTE_TOOL only when the toolkit is connected.");
+    lines.push("- If an app is NOT found in Composio (search yields 0 tools), is not supported, or fails to execute, NEVER ask the user if you should open a browser. ALWAYS immediately fall back to the `browser` tool (agent-browser).");
+    lines.push("- NEVER HIDE FETCHED DATA: When you query Google Sheets, Drive, Gmail, Notion, Slack, or GitHub, NEVER just state that you found items without listing them. Output the actual items (titles, links, dates) in a formatted Markdown table or list in your message.");
     lines.push("");
   }
 

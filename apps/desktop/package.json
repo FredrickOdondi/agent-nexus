@@ -11,8 +11,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "pnpm run build && electron . --dev",
     "start": "pnpm run build && electron .",
-    "dist": "rm -rf release && pnpm run build && node scripts/stage-resources.mjs && electron-builder --config electron-builder.config.cjs --publish never",
-    "dist:win": "rm -rf release && pnpm run build && node scripts/stage-resources.mjs win && electron-builder --win --config electron-builder.config.cjs --publish never"
+    "dist": "pnpm run build && node scripts/stage-resources.mjs mac && electron-builder --mac --config electron-builder.config.cjs --publish never",
+    "dist:win": "pnpm run build && node scripts/stage-resources.mjs win && electron-builder --win --config electron-builder.config.cjs --publish never",
+    "release:upload": "node ../../scripts/upload-releases.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.1",

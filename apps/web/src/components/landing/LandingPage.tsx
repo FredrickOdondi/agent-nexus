@@ -24,15 +24,24 @@ import {
 import { NimbusMark } from "@/components/brand/NimbusMark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DEFAULT_R2_RELEASES_URL, getReleaseUrl } from "@nimbus/shared";
+
+const RELEASES_URL = (
+  import.meta.env.VITE_RELEASES_URL ||
+  import.meta.env.VITE_R2_PUBLIC_URL ||
+  DEFAULT_R2_RELEASES_URL
+).replace(/\/$/, "");
 
 export const DOWNLOAD_LINKS = {
-  macUniversal: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.1-universal.dmg",
-  macArm64: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.1-universal.dmg",
-  macIntel: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus-0.1.1-universal.dmg",
-  windowsExe: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus.Setup.0.1.1.exe",
-  windowsArm64: "https://github.com/FredrickOdondi/agent-nexus/releases/latest/download/Nimbus.Setup.0.1.1.exe",
-  githubReleases: "https://github.com/FredrickOdondi/agent-nexus/releases",
+  macUniversal: getReleaseUrl("Nimbus-0.1.1-universal.dmg", RELEASES_URL),
+  macArm64: getReleaseUrl("Nimbus-0.1.1-universal.dmg", RELEASES_URL),
+  macIntel: getReleaseUrl("Nimbus-0.1.1-universal.dmg", RELEASES_URL),
+  windowsExe: getReleaseUrl("Nimbus.Setup.0.1.1.exe", RELEASES_URL),
+  windowsArm64: getReleaseUrl("Nimbus.Setup.0.1.1.exe", RELEASES_URL),
+  macUniversalLatest: getReleaseUrl("Nimbus-universal.dmg", RELEASES_URL),
+  windowsExeLatest: getReleaseUrl("Nimbus-Setup.exe", RELEASES_URL),
 };
+
 
 export type PlatformType = "mac" | "windows" | "other";
 

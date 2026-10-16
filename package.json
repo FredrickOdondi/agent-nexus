@@ -18,7 +18,13 @@
     "desktop": "pnpm --filter @nimbus/desktop run start",
     "desktop:dist": "pnpm --filter @nimbus/agent-core build && pnpm --filter @nimbus/server build && pnpm --filter @nimbus/web build && pnpm --filter @nimbus/desktop run dist",
     "desktop:dist:win": "pnpm --filter @nimbus/agent-core build && pnpm --filter @nimbus/server build && pnpm --filter @nimbus/web build && pnpm --filter @nimbus/desktop run dist:win",
+    "desktop:release:upload": "node scripts/upload-releases.mjs",
+    "release:upload": "node scripts/upload-releases.mjs",
     "typecheck": "pnpm -r run typecheck",
     "clean": "rm -rf node_modules apps/*/node_modules apps/*/dist packages/*/node_modules packages/*/dist"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@supabase/supabase-js": "^2.117.3"
   }
 }

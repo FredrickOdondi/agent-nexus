@@ -1,13 +1,36 @@
 import type { ToolDefinition } from "../types.js";
-import { run } from "./screen-proc.js";
+import { commandExists, run } from "./screen-proc.js";
 
 interface BrowserArgs {
-  action: "open" | "get_page" | "click_selector" | "type_selector" | "evaluate";
+  action:
+    | "open"
+    | "snapshot"
+    | "click"
+    | "fill"
+    | "screenshot"
+    | "get_page"
+    | "click_selector"
+    | "type_selector"
+    | "evaluate"
+    | "close";
   url?: string;
+  ref?: string;
   selector?: string;
   text?: string;
   expression?: string;
-  browser?: "chrome" | "safari" | "default";
+  path?: string;
+  headed?: boolean;
+  profile?: string;
+  autoConnect?: boolean;
+  interactiveOnly?: boolean;
+}
+
+function normalizeRef(refOrSelector: string): string {
+  const trimmed = refOrSelector.trim();
+  if (/^e\d+$/i.test(trimmed)) {
+    return `@${trimmed.toLowerCase()}`;
+  }
+  return trimmed;
 }
 
 export const browserTool: ToolDefinition<BrowserArgs> = {
@@ -15,162 +38,147 @@ export const browserTool: ToolDefinition<BrowserArgs> = {
   title: "browser",
   category: "external",
   description: [
-    "Inspect and control web browsers (Google Chrome or Safari).",
+    "CRITICAL: USE PROACTIVELY. Whenever a user request requires interacting with any website, SaaS platform, web app, or online service that is not directly available via Composio or direct APIs, immediately invoke this tool without asking the user for confirmation or waiting to be told. The user expects you to autonomously navigate and perform actions.",
+    "High-performance browser automation CLI & engine powered exclusively by agent-browser (Chromium/CDP).",
     "Actions:",
-    "- open: Navigate to or open a URL (url).",
-    "- get_page: Read the active tab's URL, title, and main text content via DOM.",
-    "- click_selector: Click an element on the active page by CSS selector (selector, e.g. '#submit', 'button.login').",
-    "- type_selector: Fill an input element by CSS selector with text (selector, text).",
-    "- evaluate: Run arbitrary JavaScript in the active web page and return the result (expression).",
+    "- open: Navigate to a URL (url, optional headed, optional profile e.g. 'Default' to reuse Chrome logins, optional autoConnect). Automatically returns the interactive element snapshot.",
+    "- snapshot: Capture accessibility tree with numbered element refs (@e1, @e2) for targeted interactions.",
+    "- click: Click an element by reference (@e1) or CSS selector (ref or selector).",
+    "- fill: Fill an input element by reference (@e1) or CSS selector with text (ref or selector, text).",
+    "- screenshot: Capture page screenshot (path, optional).",
+    "- evaluate: Evaluate JavaScript expression in the browser session (expression).",
+    "- close: Close active browser session and terminate daemon.",
+    "- get_page: Alias for snapshot / page element extraction.",
+    "- click_selector: Alias for click.",
+    "- type_selector: Alias for fill.",
   ].join(" "),
   parameters: {
     type: "object",
     properties: {
-      action: { type: "string", enum: ["open", "get_page", "click_selector", "type_selector", "evaluate"], description: "Browser action." },
+      action: {
+        type: "string",
+        enum: [
+          "open",
+          "snapshot",
+          "click",
+          "fill",
+          "screenshot",
+          "get_page",
+          "click_selector",
+          "type_selector",
+          "evaluate",
+          "close",
+        ],
+        description: "Browser action to execute via agent-browser.",
+      },
       url: { type: "string", description: "URL to open." },
-      selector: { type: "string", description: "CSS selector for click_selector or type_selector (e.g. 'input[name=q]', 'button.btn-primary')." },
-      text: { type: "string", description: "Text to type into the selected input element." },
+      ref: { type: "string", description: "Element reference from snapshot (e.g. '@e1', '@e2')." },
+      selector: { type: "string", description: "CSS selector fallback (e.g. '#submit', 'input[name=q]')." },
+      text: { type: "string", description: "Text to type or fill into target element." },
       expression: { type: "string", description: "JavaScript expression to evaluate in the page." },
-      browser: { type: "string", enum: ["chrome", "safari", "default"], description: "Target browser (defaults to chrome, falls back to safari)." },
+      path: { type: "string", description: "File path to save screenshot." },
+      headed: { type: "boolean", description: "Show visible browser window on screen (defaults to headless)." },
+      profile: { type: "string", description: "Chrome profile name (e.g. 'Default') to reuse saved logins and cookies." },
+      autoConnect: { type: "boolean", description: "Auto-connect to an already-running Chrome instance." },
+      interactiveOnly: { type: "boolean", description: "Filter snapshot to interactive elements only (default true)." },
     },
     required: ["action"],
   },
-  permission: "Computer",
-  readOnly: false,
-  summarize: (a) => `${a.action} ${a.url ?? a.selector ?? ""}`.trim(),
-  permissionSubject: (a) => a.url || a.selector || a.action,
+  permission: "WebFetch",
+  readOnly: true,
+  summarize: (a) => `${a.action} ${a.url ?? a.ref ?? a.selector ?? ""}`.trim(),
+  permissionSubject: (a) => a.url || a.ref || a.selector || a.action,
   async execute(args) {
-    const { action, url, selector, text, expression } = args;
+    const { action, url, text, expression } = args;
+    const targetRefOrSelector = args.ref ? normalizeRef(args.ref) : args.selector ? normalizeRef(args.selector) : undefined;
 
-    if (action === "open") {
-      if (!url) return { output: "open action requires a url.", isError: true };
-      const targetUrl = url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`;
-      if (process.platform === "darwin") {
-        if (args.browser === "safari") {
-          await run("open", ["-a", "Safari", targetUrl]);
-        } else {
-          try {
-            await run("open", ["-a", "Google Chrome", targetUrl]);
-          } catch {
-            await run("open", [targetUrl]);
-          }
-        }
-        return { output: `Opened ${targetUrl}.` };
-      }
-      if (process.platform === "win32") {
-        await run("powershell", ["-Command", `Start-Process "${targetUrl}"`]);
-        return { output: `Opened ${targetUrl}.` };
-      }
-      await run("xdg-open", [targetUrl]);
-      return { output: `Opened ${targetUrl}.` };
+    const hasAgentBrowser = await commandExists("agent-browser");
+    if (!hasAgentBrowser) {
+      return {
+        output: "agent-browser CLI is the required browser tool. Please install it with: npm install -g agent-browser && agent-browser install",
+        isError: true,
+      };
     }
 
-    if (process.platform === "darwin") {
-      // Determine target browser
-      const isSafari = args.browser === "safari";
-      const appName = isSafari ? "Safari" : "Google Chrome";
+    try {
+      if (action === "open") {
+        if (!url) return { output: "open action requires a url.", isError: true };
+        const targetUrl = url.startsWith("http://") || url.startsWith("https://") ? url : `https://${url}`;
+        const openArgs = ["open", targetUrl];
+        if (args.headed) openArgs.push("--headed");
+        if (args.profile) openArgs.push("--profile", args.profile);
+        if (args.autoConnect) openArgs.push("--auto-connect");
 
-      const runJs = async (jsCode: string) => {
-        const escaped = jsCode.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-        const script = isSafari
-          ? `tell application "Safari" to do JavaScript "${escaped}" in current tab of front window`
-          : `tell application "Google Chrome" to execute front window's active tab javascript "${escaped}"`;
-        const { stdout } = await run("osascript", ["-e", script]);
-        return stdout.trim();
-      };
+        const { stdout: openOut } = await run("agent-browser", openArgs, 30_000);
 
-      if (action === "get_page") {
+        // Follow with an immediate interactive snapshot to orient the agent
+        let snapshotOut = "";
         try {
-          const infoScript = isSafari
-            ? `tell application "Safari" to return (URL of current tab of front window) & "|||" & (name of current tab of front window)`
-            : `tell application "Google Chrome" to return (URL of active tab of front window) & "|||" & (title of active tab of front window)`;
-          const { stdout: info } = await run("osascript", ["-e", infoScript]);
-          const [currentUrl, pageTitle] = info.trim().split("|||");
-
-          // Read page text snippet via DOM
-          const textContent = await runJs(`
-            (() => {
-              const body = document.body;
-              if (!body) return '';
-              return (body.innerText || '').slice(0, 4000);
-            })()
-          `).catch(() => "");
-
-          return {
-            output: [
-              `URL: ${currentUrl ?? "unknown"}`,
-              `Title: ${pageTitle ?? "unknown"}`,
-              `\nPage Content:\n${textContent || "(no text content)"}`,
-            ].join("\n"),
-          };
-        } catch (e) {
-          return {
-            output: `Could not inspect ${appName}: ${(e as Error).message}. (Ensure ${appName} is running and has 'Allow JavaScript from Apple Events' enabled in View → Developer).`,
-            isError: true,
-          };
+          const snap = await run("agent-browser", ["snapshot", "-i"], 10_000);
+          snapshotOut = snap.stdout.trim();
+        } catch {
+          // Non-fatal if snapshot fails
         }
+
+        const combined = [
+          openOut.trim(),
+          snapshotOut ? `\nPage Elements:\n${snapshotOut}` : "",
+        ].filter(Boolean).join("\n");
+
+        return { output: combined };
       }
 
-      if (action === "click_selector") {
-        if (!selector) return { output: "click_selector requires a CSS selector.", isError: true };
-        try {
-          const res = await runJs(`
-            (() => {
-              const el = document.querySelector(${JSON.stringify(selector)});
-              if (!el) return 'NOT_FOUND';
-              el.scrollIntoView({ block: 'center', inline: 'center' });
-              el.click();
-              return 'CLICKED';
-            })()
-          `);
-          if (res === "NOT_FOUND") return { output: `No element found matching selector "${selector}".`, isError: true };
-          return { output: `Clicked element matching "${selector}".` };
-        } catch (e) {
-          return { output: `Failed to click selector "${selector}": ${(e as Error).message}`, isError: true };
+      if (action === "snapshot" || action === "get_page") {
+        const snapArgs = ["snapshot"];
+        if (args.interactiveOnly !== false) {
+          snapArgs.push("-i");
         }
+        const { stdout } = await run("agent-browser", snapArgs, 15_000);
+        return { output: stdout.trim() || "(empty snapshot)" };
       }
 
-      if (action === "type_selector") {
-        if (!selector) return { output: "type_selector requires a CSS selector.", isError: true };
-        try {
-          const res = await runJs(`
-            (() => {
-              const el = document.querySelector(${JSON.stringify(selector)});
-              if (!el) return 'NOT_FOUND';
-              el.focus();
-              el.value = ${JSON.stringify(text ?? "")};
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-              return 'TYPED';
-            })()
-          `);
-          if (res === "NOT_FOUND") return { output: `No element found matching selector "${selector}".`, isError: true };
-          return { output: `Typed text into "${selector}".` };
-        } catch (e) {
-          return { output: `Failed to type into "${selector}": ${(e as Error).message}`, isError: true };
+      if (action === "click" || action === "click_selector") {
+        if (!targetRefOrSelector) {
+          return { output: "click action requires a ref (e.g. '@e1') or selector.", isError: true };
         }
+        const { stdout } = await run("agent-browser", ["click", targetRefOrSelector], 15_000);
+        return { output: stdout.trim() || `Clicked ${targetRefOrSelector}.` };
+      }
+
+      if (action === "fill" || action === "type_selector") {
+        if (!targetRefOrSelector) {
+          return { output: "fill action requires a ref (e.g. '@e1') or selector.", isError: true };
+        }
+        const fillText = text ?? "";
+        const { stdout } = await run("agent-browser", ["fill", targetRefOrSelector, fillText], 15_000);
+        return { output: stdout.trim() || `Filled ${targetRefOrSelector}.` };
+      }
+
+      if (action === "screenshot") {
+        const scArgs = ["screenshot"];
+        if (args.path) scArgs.push(args.path);
+        const { stdout } = await run("agent-browser", scArgs, 20_000);
+        return { output: stdout.trim() || "Screenshot captured." };
       }
 
       if (action === "evaluate") {
         if (!expression) return { output: "evaluate requires a JavaScript expression.", isError: true };
-        try {
-          const res = await runJs(`
-            (() => {
-              try {
-                const out = eval(${JSON.stringify(expression)});
-                return typeof out === 'object' ? JSON.stringify(out) : String(out);
-              } catch (err) {
-                return 'ERROR: ' + err.message;
-              }
-            })()
-          `);
-          return { output: res };
-        } catch (e) {
-          return { output: `JavaScript evaluation failed: ${(e as Error).message}`, isError: true };
-        }
+        const { stdout } = await run("agent-browser", ["eval", expression], 15_000);
+        return { output: stdout.trim() };
       }
-    }
 
-    return { output: `Browser action "${action}" is not supported on this OS without macOS Apple Events.`, isError: true };
+      if (action === "close") {
+        const { stdout } = await run("agent-browser", ["close"], 10_000);
+        return { output: stdout.trim() || "Browser closed." };
+      }
+
+      return { output: `Unknown browser action: ${action}`, isError: true };
+    } catch (err) {
+      return {
+        output: `agent-browser error: ${(err as Error).message}`,
+        isError: true,
+      };
+    }
   },
 };
+

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  AppWindow,
   Bot,
   Check,
   ChevronRight,
@@ -27,6 +28,7 @@ import type { ToolCallPart, ToolDisplay } from "@nimbus/shared";
 import { NimbusMark } from "@/components/brand/NimbusMark";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { InteractiveWidgetCard } from "./InteractiveWidgetCard";
 
 const ICONS: Record<string, typeof Terminal> = {
   run_terminal_cmd: Terminal,
@@ -48,11 +50,13 @@ const ICONS: Record<string, typeof Terminal> = {
   skill: Sparkles,
   image_gen: ImageIcon,
   computer: MousePointer2,
+  render_ui: AppWindow,
 };
 
 function headline(part: ToolCallPart): string {
   const a = part.args ?? {};
   switch (part.name) {
+    case "render_ui": return String(a.title ?? "");
     case "run_terminal_cmd": return String(a.command ?? "");
     case "read_file": case "write_file": case "search_replace": return String(a.path ?? "");
     case "list_dir": return String(a.path ?? ".");
@@ -95,9 +99,12 @@ function StatusIcon({ status }: { status: ToolCallPart["status"] }) {
 }
 
 export function ToolCallCard({ part, defaultOpen = false }: { part: ToolCallPart; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const isWidget = part.name === "render_ui" || part.display?.kind === "ui";
+  const [open, setOpen] = useState(defaultOpen || isWidget);
   useEffect(() => {
-    if (part.name === "computer" && part.display?.kind === "image") setOpen(true);
+    if ((part.name === "computer" && part.display?.kind === "image") || part.display?.kind === "ui" || part.name === "render_ui") {
+      setOpen(true);
+    }
   }, [part.name, part.display]);
   const Icon = part.name.startsWith("COMPOSIO_") ? Plug : (ICONS[part.name] ?? Wrench);
   const title = headline(part);
@@ -227,6 +234,15 @@ function Display({ display, status }: { display: ToolDisplay; status: ToolCallPa
       return <img src={display.url} alt={display.prompt} className="max-h-80 rounded-lg" loading="lazy" />;
     case "plan":
       return display.plan ? <pre className="max-h-80 overflow-auto text-xs whitespace-pre-wrap">{display.plan}</pre> : <p className="text-xs text-muted-foreground">Plan mode {display.mode === "enter" ? "entered" : "exited"}.</p>;
+    case "ui":
+      return (
+        <InteractiveWidgetCard
+          title={display.title}
+          html={display.html}
+          description={display.description}
+          initialHeight={display.height}
+        />
+      );
     case "generic":
       return <pre className="max-h-60 overflow-auto font-mono text-xs whitespace-pre-wrap">{display.text}</pre>;
   }

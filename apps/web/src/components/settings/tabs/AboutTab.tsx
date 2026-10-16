@@ -82,7 +82,7 @@ function UpdaterControls() {
                 <AlertCircle className="size-3.5" /> {status.message || "Could not check for updates"}
               </span>
             ) : (
-              "Auto-updates check periodically via GitHub Releases."
+              "Auto-updates check periodically via Cloudflare R2."
             )}
           </p>
         </div>

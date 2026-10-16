@@ -47,7 +47,7 @@ export const askUserQuestion: ToolDefinition<{ question: string; options: Questi
   title: "ask_user_question",
   category: "workflow",
   description:
-    "Ask the user a structured question when the task is ambiguous (design direction, framework, schema…). Provide 2-5 concise options. Execution pauses until the user answers. Do not use for permission requests.",
+    "Ask the user a structured question when the task is ambiguous (design direction, framework, schema…). Provide 2-5 concise options. Execution pauses until the user answers. Do NOT use for permission requests or to ask if you should use the browser/tools—be proactive and use your tools autonomously.",
   parameters: {
     type: "object",
     properties: {

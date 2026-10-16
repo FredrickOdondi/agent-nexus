@@ -66,9 +66,21 @@ jobs:
             apps/desktop/release/*.yml
           if-no-files-found: error
 
+      - name: Upload to Cloudflare R2
+        shell: bash
+        if: ${{ env.R2_SECRET_ACCESS_KEY != '' }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID || '09e44e6a7eadceba9da84d9a5efb7681' }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME || 'nimbus-releases' }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL || 'https://pub-ce50cd78e02245c4afb325681955755a.r2.dev' }}
+        run: node scripts/upload-releases.mjs
+
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
+        continue-on-error: true
         with:
           files: |
             apps/desktop/release/*.dmg
@@ -76,4 +88,5 @@ jobs:
             apps/desktop/release/*.zip
             apps/desktop/release/*.yml
             apps/desktop/release/*.blockmap
+
 

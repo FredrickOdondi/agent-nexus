@@ -96,6 +96,7 @@ export type ToolDisplay =
   | { kind: "memory"; scope: "global" | "workspace"; text: string }
   | { kind: "image"; url: string; prompt: string }
   | { kind: "plan"; mode: "enter" | "exit"; plan?: string }
+  | { kind: "ui"; title: string; html: string; description?: string; height?: number }
   | { kind: "generic"; text: string };
 
 export interface SearchResult {

@@ -19,10 +19,8 @@ module.exports = {
     { from: "resources/screen", to: "screen", filter: ["**/*", "!**/*.swift", "!**/*.c", "!**/*.m", "!nimbus-input", "!nimbus-input-*", "!nimbus-see", "!nimbus-see-*"] },
   ],
   publish: {
-    provider: "github",
-    owner: "FredrickOdondi",
-    repo: "agent-nexus",
-    releaseType: "release",
+    provider: "generic",
+    url: process.env.R2_PUBLIC_URL || process.env.RELEASES_URL || "https://pub-ce50cd78e02245c4afb325681955755a.r2.dev",
   },
   mac: {
     category: "public.app-category.productivity",

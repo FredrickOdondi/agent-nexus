@@ -16,6 +16,7 @@ import { runTerminalCmd } from "./tools/terminal.js";
 import { fileWatchTool } from "./tools/watch.js";
 import { webFetch, webSearch } from "./tools/web.js";
 import { askUserQuestion, enterPlanMode, exitPlanMode, memoryTool, skillTool, todoWrite } from "./tools/workflow.js";
+import { renderUiTool } from "./tools/ui.js";
 import { subagentManageTool } from "./tools/subagent.js";
 
 export const BUILTIN_TOOLS: ToolDefinition<any>[] = [
@@ -47,6 +48,7 @@ export const BUILTIN_TOOLS: ToolDefinition<any>[] = [
   fileWatchTool,
   docParseTool,
   subagentManageTool,
+  renderUiTool,
 ];
 
 export interface RegistryOptions {

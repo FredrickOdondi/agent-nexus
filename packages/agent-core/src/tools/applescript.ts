@@ -12,7 +12,7 @@ export const applescriptTool: ToolDefinition<AppleScriptArgs> = {
   category: "external",
   description: [
     "Run AppleScript or JXA (JavaScript for Automation) to control macOS applications, Finder, system dialogs, and native apps directly.",
-    "Much faster and more reliable than clicking UI elements for scriptable Mac apps like Safari, Mail, Calendar, Notes, Finder, and System Events.",
+    "Much faster and more reliable than clicking UI elements for scriptable native Mac apps like Mail, Calendar, Notes, Finder, and System Events (for web browsing, use the browser tool).",
     "Only available on macOS.",
   ].join(" "),
   parameters: {

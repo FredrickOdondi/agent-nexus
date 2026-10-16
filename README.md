@@ -49,16 +49,31 @@ To build the Windows installer from a Mac, in the same folder:
 pnpm desktop:dist:win
 ```
 
-The setup program is `apps/desktop/release/Nimbus Setup 0.1.0.exe`. It installs on 64-bit Windows and on Windows on ARM. The person runs that file and follows the installer.
+The setup program is `apps/desktop/release/Nimbus Setup 0.1.0.exe` (or `Nimbus.Setup.0.1.1.exe`). It installs on 64-bit Windows and on Windows on ARM. The person runs that file and follows the installer.
 
 Replace the copy already on the other Mac with a newly built disk image. Pull these changes, run `pnpm desktop:dist` again, and install that image. If the app still cannot start, the dialog quotes the server's own error, and the same text is written to `~/Library/Application Support/Nimbus/server.log`.
 
-GitHub Actions can build both as well: the Desktop installers workflow, run by hand or by pushing a `v*` tag. Download `Nimbus-*.dmg` or `Nimbus Setup *.exe` from the workflow artifacts.
+### Cloudflare R2 for Installers & Updates
+
+Installers (`.dmg`, `.exe`) and auto-update metadata (`latest-mac.yml`, `latest.yml`) are hosted on Cloudflare R2 (10 GB free forever, zero egress fees, no file size caps) in the public `nimbus-releases` bucket.
+
+To upload locally built installers to Cloudflare R2:
+```bash
+pnpm release:upload
+```
+
+Public download URLs:
+- macOS DMG: `https://pub-ce50cd78e02245c4afb325681955755a.r2.dev/Nimbus-universal.dmg`
+- Windows EXE: `https://pub-ce50cd78e02245c4afb325681955755a.r2.dev/Nimbus-Setup.exe`
+
+GitHub Actions can build and upload both as well: the Desktop installers workflow (`.github/workflows/desktop.yml`), run by hand or by pushing a `v*` tag. When `R2_SECRET_ACCESS_KEY` and `R2_ACCESS_KEY_ID` are present in GitHub Secrets, it uploads directly to Cloudflare R2.
 
 The first public build should be signed. Add these repository secrets and the workflow will sign and, on Mac, notarize:
 
 | Secret | Used for |
 | --- | --- |
+| `R2_ACCESS_KEY_ID` | Cloudflare R2 access key ID |
+| `R2_SECRET_ACCESS_KEY` | Cloudflare R2 secret access key |
 | `CSC_LINK` | Base64 Apple Developer ID `.p12` |
 | `CSC_KEY_PASSWORD` | Password for that `.p12` |
 | `APPLE_ID` | Apple ID that can notarize |
@@ -67,7 +82,7 @@ The first public build should be signed. Add these repository secrets and the wo
 | `WIN_CSC_LINK` | Base64 Windows Authenticode `.pfx` |
 | `WIN_CSC_KEY_PASSWORD` | Password for that `.pfx` |
 
-Without those secrets the workflow still uploads an installer. macOS Gatekeeper will ask the person to right-click the app and choose Open the first time, and Windows SmartScreen will warn. Screen Recording and Accessibility on a Mac stick to the app only after it is signed with a Developer ID.
+Without those signing secrets the workflow still uploads an installer to Supabase Storage. macOS Gatekeeper will ask the person to right-click the app and choose Open the first time, and Windows SmartScreen will warn. Screen Recording and Accessibility on a Mac stick to the app only after it is signed with a Developer ID.
 
 On a Mac, the build compiles the click helper with `clang` and puts it inside the app. The first screenshot asks for Screen Recording. The first click asks for Accessibility.
 
